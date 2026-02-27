@@ -1,16 +1,23 @@
 import io
 import numpy as np
+import torch
+import torch.nn as nn
 import torchvision.transforms as transforms
 from google.cloud import vision
 from PIL import Image
 import argparse
+from torchvision import models
+import os
+from dotenv import load_dotenv
 
+load_dotenv()  # Load environment variables from .env file
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 class DeepfakeImagePreprocessor:
     
     # Preprocesses images using Google Cloud Vision API and converts to tensors
     
-    def __init__(self, credentials_path=""): # Provide path to credentials
+    def __init__(self, credentials_path=GOOGLE_APPLICATION_CREDENTIALS): # Provide path to credentials
         
         if credentials_path:
             self.client = vision.ImageAnnotatorClient.from_service_account_file(
@@ -158,21 +165,142 @@ class DeepfakeImagePreprocessor:
         }
 
 
+class DeepfakeDetector(nn.Module):
+    
+    # Deepfake detection model using pre-trained EfficientNet.
+    
+    def __init__(self, num_vision_features=5, dropout_rate=0.3):
+        super(DeepfakeDetector, self).__init__()
+        
+        # Load pre-trained EfficientNet-B0
+        self.efficientnet = models.efficientnet_b0(pretrained=True)
+        
+        # Get the number of features from the classifier
+        num_efficientnet_features = self.efficientnet.classifier[1].in_features
+        
+        # Replace the classifier to output features instead of classes
+        self.efficientnet.classifier = nn.Identity()
+        
+        # Fusion layer to combine EfficientNet features with Vision API features
+        self.fusion_layer = nn.Sequential(
+            nn.Linear(num_efficientnet_features + num_vision_features, 512),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(256, 1),  # Binary classification: real (0) or fake (1)
+            nn.Sigmoid()  # Output confidence score between 0 and 1
+        )
+    
+    def forward(self, image_tensor, vision_feature_vector):
+        
+        # Forward pass through the network
+        
+        # Extract features from image using EfficientNet
+        image_features = self.efficientnet(image_tensor)
+        
+        # Concatenate image features with Vision API features
+        combined_features = torch.cat([image_features, vision_feature_vector], dim=1)
+        
+        # Pass through fusion layer to get final confidence score
+        confidence = self.fusion_layer(combined_features)
+        
+        return confidence
+
+
+class DeepfakeDetectionPipeline:
+    
+    # Complete pipeline for deepfake detection that combines preprocessing and model inference
+    
+    def __init__(self, credentials_path="", model_path=None, device=None):
+        
+        # Initialize the detection pipeline
+        
+        self.preprocessor = DeepfakeImagePreprocessor(credentials_path)
+        
+        # Set device
+        if device is None:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = device
+        
+        # Initialize model
+        self.model = DeepfakeDetector()
+        
+        # Load trained weights if provided
+        if model_path:
+            self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+            print(f"Loaded model weights from {model_path}")
+        else:
+            print("Warning: No model weights provided. Using randomly initialized weights.")
+            print("For production use, you should train the model on a deepfake dataset.")
+        
+        self.model.to(self.device)
+        self.model.eval()  # Set to evaluation mode
+    
+    def predict(self, image_path, threshold=0.5):
+        
+        # Predict whether an image is a deepfake
+        
+        # Preprocess image
+        preprocessed = self.preprocessor.process_image(image_path)
+        
+        # Convert to tensors and move to device
+        image_tensor = preprocessed['image_tensor'].to(self.device)
+        feature_vector = torch.tensor(preprocessed['feature_vector']).unsqueeze(0).to(self.device)
+        
+        # Run inference
+        with torch.no_grad():
+            confidence = self.model(image_tensor, feature_vector)
+            confidence_score = confidence.item()
+        
+        # Determine classification
+        is_deepfake = confidence_score > threshold
+        
+        return {
+            'confidence_score': confidence_score,
+            'is_deepfake': is_deepfake,
+            'classification': 'DEEPFAKE' if is_deepfake else 'REAL',
+            'threshold': threshold,
+            'num_faces_detected': len(preprocessed['vision_features']['faces']),
+            'original_size': preprocessed['original_size']
+        }
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Preprocess an image for deepfake detection")  
+    parser = argparse.ArgumentParser(description="Deepfake detection using pre-trained model")  
     parser.add_argument("image_path", type=str, help="Path to the input image")
+    parser.add_argument("--credentials", type=str, default="", help="Path to Google Cloud credentials")
+    parser.add_argument("--model", type=str, default=None, help="Path to trained model weights")
+    parser.add_argument("--threshold", type=float, default=0.5, help="Classification threshold (0-1)")
     args = parser.parse_args()
     
-    preprocessor = DeepfakeImagePreprocessor()
+    # Initialize pipeline
+    pipeline = DeepfakeDetectionPipeline(
+        credentials_path=args.credentials,
+        model_path=args.model
+    )
     
     try:
-        result = preprocessor.process_image(args.image_path)
+        # Run prediction
+        result = pipeline.predict(args.image_path, threshold=args.threshold)
         
-        print(f"Image processed successfully!")
-        print(f"Original size: {result['original_size']}")
-        print(f"Tensor shape: {result['image_tensor'].shape}")
-        print(f"Number of faces detected: {len(result['vision_features']['faces'])}")
-        print(f"Feature vector shape: {result['feature_vector'].shape}")
-        print(f"Feature vector: {result['feature_vector']}")
+        print("\n" + "="*50)
+        print("DEEPFAKE DETECTION RESULTS")
+        print("="*50)
+        print(f"Image: {args.image_path}")
+        print(f"Classification: {result['classification']}")
+        print(f"Confidence Score: {result['confidence_score']:.4f}")
+        print(f"Threshold: {result['threshold']}")
+        print(f"Faces Detected: {result['num_faces_detected']}")
+        print(f"Original Size: {result['original_size']}")
+        print("="*50)
+        
+        if result['is_deepfake']:
+            print(f"\n⚠️  This image is likely a DEEPFAKE (confidence: {result['confidence_score']:.2%})")
+        else:
+            print(f"\n✓ This image appears to be REAL (confidence: {1-result['confidence_score']:.2%})")
+            
     except Exception as e:
-        print(f"Error processing image: {e}")
+        print(f"Error during detection: {e}")
