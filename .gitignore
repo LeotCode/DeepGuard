@@ -2,5 +2,8 @@ venv/
 .env
 __pycache__/
 dataset/
+image_dataset/
+video_dataset/
 face_dataset/
+Dataset_Subfolder/
 test/

@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import os
-from feature_extractor import DeepfakeImagePreprocessor, train_model
+from main import DeepfakeImagePreprocessor, train_model
 import json
 from dotenv import load_dotenv
 load_dotenv()
@@ -94,81 +94,7 @@ def split_dataset(image_paths, labels, train_ratio=0.8):
     val_labels = [labels[i] for i in val_indices]
     
     return train_paths, train_labels, val_paths, val_labels
-
-
-def main():
-    # Configuration
-    CONFIG = {
-        'dataset_dir': dataset_dir,  # CHANGE THIS
-        'credentials_path': google_credentials_path,  # CHANGE THIS
-        'batch_size': 16,
-        'num_epochs': 1,
-        'learning_rate': 0.0001,
-        'train_ratio': 0.8,
-        'save_path': 'deepfake_model.pth'
-    }
     
-    print("="*60)
-    print("DEEPFAKE DETECTION MODEL TRAINING")
-    print("="*60)
-    print(f"Configuration:")
-    for key, value in CONFIG.items():
-        print(f"  {key}: {value}")
-    print("="*60)
-    
-    # Initialize preprocessor
-    print("\n[1/5] Initializing preprocessor...")
-    preprocessor = DeepfakeImagePreprocessor(CONFIG['credentials_path'])
-    
-    # Load dataset
-    print("\n[2/5] Loading dataset...")
-    image_paths, labels = load_dataset_from_directory(CONFIG['dataset_dir'])
-    print(f"Total images: {len(image_paths)}")
-    print(f"Real images: {sum(1 for l in labels if l == 0)}")
-    print(f"Fake images: {sum(1 for l in labels if l == 1)}")
-    
-    # Split dataset
-    print("\n[3/5] Splitting dataset...")
-    train_paths, train_labels, val_paths, val_labels = split_dataset(
-        image_paths, labels, CONFIG['train_ratio']
-    )
-    print(f"Training set: {len(train_paths)} images")
-    print(f"Validation set: {len(val_paths)} images")
-    
-    # Create datasets and dataloaders
-    print("\n[4/5] Creating dataloaders...")
-    train_dataset = DeepfakeDataset(train_paths, train_labels, preprocessor)
-    val_dataset = DeepfakeDataset(val_paths, val_labels, preprocessor)
-    
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=CONFIG['batch_size'],
-        shuffle=True,
-        num_workers=0  # Set to 0 to avoid multiprocessing issues with Vision API
-    )
-    
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=CONFIG['batch_size'],
-        shuffle=False,
-        num_workers=0
-    )
-    
-    # Train model
-    print("\n[5/5] Training model...")
-    print("="*60)
-    model = train_model(
-        train_data_loader=train_loader,
-        val_data_loader=val_loader,
-        num_epochs=CONFIG['num_epochs'],
-        learning_rate=CONFIG['learning_rate'],
-        save_path=CONFIG['save_path']
-    )
-    
-    print("\n" + "="*60)
-    print("TRAINING COMPLETE!")
-    print(f"Model saved to: {CONFIG['save_path']}")
-    print("="*60)
 
 
 if __name__ == "__main__":
@@ -179,7 +105,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, required=True, help="Path to dataset directory")
     parser.add_argument("--credentials", type=str, default="credentials.json", help="Path to Google Cloud credentials")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for training")
-    parser.add_argument("--epochs", type=int, default=1, help="Number of training epochs")
+    parser.add_argument("--epochs", type=int, default=10,help="Number of training epochs")
     parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
     parser.add_argument("--output", type=str, default="deepfake_model.pth", help="Output model path")
     

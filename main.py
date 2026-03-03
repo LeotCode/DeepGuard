@@ -1,4 +1,5 @@
 import io
+import cv2
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,6 +9,8 @@ from PIL import Image
 import argparse
 from torchvision import models
 import os
+import mimetypes
+#from video_trainer import VideoDeepfakeDetectionPipeline
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
@@ -164,6 +167,65 @@ class DeepfakeImagePreprocessor:
             'original_size': pil_image.size
         }
 
+    def extract_frames(self, video_path, num_frames=10):
+        # Extracts evenly spaced frames from a video
+        cap = cv2.VideoCapture(video_path)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        if total_frames == 0:
+            raise ValueError("Could not read video or video has no frames.")
+            
+        # Calculate indices for evenly spaced frames
+        frame_indices = np.linspace(0, total_frames - 1, num_frames, dtype=int)
+        
+        frames = []
+        for idx in frame_indices:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ret, frame = cap.read()
+            if ret:
+                # Convert BGR (OpenCV) to RGB (PIL)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                pil_image = Image.fromarray(frame_rgb)
+                
+                # Convert PIL back to raw bytes for Google Vision API
+                img_byte_arr = io.BytesIO()
+                pil_image.save(img_byte_arr, format='JPEG')
+                img_bytes = img_byte_arr.getvalue()
+                
+                frames.append((pil_image, img_bytes))
+        
+        cap.release()
+        return frames
+
+    def process_video(self, video_path, num_frames=10, target_size=(224, 224)):
+        # Processes a video and returns sequences of tensors and features for the LSTM
+        frames = self.extract_frames(video_path, num_frames)
+        
+        image_tensors = []
+        feature_vectors = []
+        
+        print(f"Processing {len(frames)} frames through Vision API (Watch your API quota!)...")
+        for pil_image, img_bytes in frames:
+            # Extract features and process exactly like a single image
+            vision_features = self.extract_vision_features(img_bytes)
+            image_tensor = self.preprocess_image_to_tensor(pil_image, target_size)
+            feature_vector = self.create_feature_vector(vision_features)
+            
+            image_tensors.append(image_tensor)
+            feature_vectors.append(torch.tensor(feature_vector))
+            
+        # Concatenate lists into sequential tensors for the LSTM
+        # Shape becomes: (Batch=1, Seq_Len=10, Channels=3, H=224, W=224)
+        seq_image_tensors = torch.cat(image_tensors, dim=0).unsqueeze(0) 
+        
+        # Shape becomes: (Batch=1, Seq_Len=10, Features=5)
+        seq_feature_vectors = torch.stack(feature_vectors, dim=0).unsqueeze(0)
+        
+        return {
+            'image_tensor_seq': seq_image_tensors,
+            'feature_vector_seq': seq_feature_vectors,
+            'num_frames_processed': len(frames)
+        }
 
 class DeepfakeDetector(nn.Module):
     
@@ -266,41 +328,105 @@ class DeepfakeDetectionPipeline:
             'num_faces_detected': len(preprocessed['vision_features']['faces']),
             'original_size': preprocessed['original_size']
         }
+    
+def train_model(train_data_loader, val_data_loader, num_epochs=10, learning_rate=0.0001, save_path="deepfake_model.pth"):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = DeepfakeDetector().to(device)
+    
+        criterion = nn.BCELoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    
+        for epoch in range(num_epochs):
+            # --- Training phase ---
+            model.train()
+            train_loss = 0.0
+            for image_tensors, vision_features, labels in train_data_loader:
+                image_tensors = image_tensors.to(device)
+                vision_features = vision_features.to(device)
+                labels = labels.float().unsqueeze(1).to(device)
+            
+                optimizer.zero_grad()
+                outputs = model(image_tensors, vision_features)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                train_loss += loss.item()
+        
+            # --- Validation phase ---
+            model.eval()
+            val_loss = 0.0
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for image_tensors, vision_features, labels in val_data_loader:
+                    image_tensors = image_tensors.to(device)
+                    vision_features = vision_features.to(device)
+                    labels = labels.float().unsqueeze(1).to(device)
+                
+                    outputs = model(image_tensors, vision_features)
+                    val_loss += criterion(outputs, labels).item()
+                    predicted = (outputs > 0.5).float()
+                    correct += (predicted == labels).sum().item()
+                    total += labels.size(0)
+        
+            print(f"Epoch [{epoch+1}/{num_epochs}] "
+                f"Train Loss: {train_loss/len(train_data_loader):.4f} | "
+                f"Val Loss: {val_loss/len(val_data_loader):.4f} | "
+                f"Val Accuracy: {100*correct/total:.2f}%")
+    
+        torch.save(model.state_dict(), save_path)
+        print(f"Model saved to {save_path}")
+        return model
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Deepfake detection using pre-trained model")  
-    parser.add_argument("image_path", type=str, help="Path to the input image")
+    parser.add_argument("file_path", type=str, help="Path to the input image")
     parser.add_argument("--credentials", type=str, default="", help="Path to Google Cloud credentials")
     parser.add_argument("--model", type=str, default=None, help="Path to trained model weights")
     parser.add_argument("--threshold", type=float, default=0.5, help="Classification threshold (0-1)")
     args = parser.parse_args()
     
-    # Initialize pipeline
-    pipeline = DeepfakeDetectionPipeline(
-        credentials_path=args.credentials,
-        model_path=args.model
-    )
+    # Check if the file is an image or a video
+    mime_type, _ = mimetypes.guess_type(args.file_path)
+    is_video = mime_type and mime_type.startswith('video')
     
     try:
-        # Run prediction
-        result = pipeline.predict(args.image_path, threshold=args.threshold)
-        
+        if is_video:
+            print("\n🎥 Video file detected. Initializing LSTM Video Pipeline...")
+            pipeline = VideoDeepfakeDetectionPipeline(
+                credentials_path=args.credentials,
+                model_path=args.video_model
+            )
+            result = pipeline.predict(args.file_path, threshold=args.threshold, num_frames=args.frames)
+            print_type = "Video"
+        else:
+            print("\n🖼️ Image file detected. Initializing Image Pipeline...")
+            pipeline = DeepfakeDetectionPipeline(
+                credentials_path=args.credentials,
+                model_path=args.model
+            )
+            result = pipeline.predict(args.file_path, threshold=args.threshold)
+            print_type = "Image"
+            
         print("\n" + "="*50)
         print("DEEPFAKE DETECTION RESULTS")
         print("="*50)
-        print(f"Image: {args.image_path}")
+        print(f"File: {args.file_path} ({print_type})")
         print(f"Classification: {result['classification']}")
         print(f"Confidence Score: {result['confidence_score']:.4f}")
-        print(f"Threshold: {result['threshold']}")
         print(f"Faces Detected: {result['num_faces_detected']}")
         print(f"Original Size: {result['original_size']}")
+        
+        if is_video:
+            print(f"Frames Analyzed: {result['frames_analyzed']}")
+            
         print("="*50)
         
         if result['is_deepfake']:
-            print(f"\n⚠️  This image is likely a DEEPFAKE (confidence: {result['confidence_score']:.2%})")
+            print(f"\n⚠️  This {print_type.lower()} is likely a DEEPFAKE (confidence: {result['confidence_score']:.2%})")
         else:
-            print(f"\n✓ This image appears to be REAL (confidence: {1-result['confidence_score']:.2%})")
+            print(f"\n✓ This {print_type.lower()} appears to be REAL (confidence: {1-result['confidence_score']:.2%})")
             
     except Exception as e:
         print(f"Error during detection: {e}")
