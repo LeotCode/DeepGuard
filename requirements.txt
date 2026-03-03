@@ -1,0 +1,10 @@
+# Core ML (cross-platform)
+tensorflow>=2.16,<2.17
+
+# Core libraries
+numpy>=1.26,<2.0
+pillow>=10.0
+
+# Google Vision API
+google-cloud-vision>=3.10
+certifi>=2023.0.0

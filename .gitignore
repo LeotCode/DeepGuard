@@ -1,0 +1,18 @@
+# Ignore virtual environment
+.venv/
+
+# Ignore Google Vision API key
+vision_key/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore model files
+models/
+
+# macOS junk
+.DS_Store
+
+# Ignore datasets
+datasets/
