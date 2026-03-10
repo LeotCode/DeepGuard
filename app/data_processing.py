@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 
 load_dotenv('myEnv.env')  
 
-#point to the service account file
+# point to the service account file
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r'C:\Users\USER\Downloads\deepguard-487004-6cc65ae83600.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_PATH')
 
 def analyze_image(image_path):
     # Initialize the client
