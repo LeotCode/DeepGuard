@@ -1,6 +1,28 @@
-venv/
-.env
+ # Python
 __pycache__/
-dataset/
-face_dataset/
-test/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+env/
+
+# Environment variables
+myEnv.env
+.env
+
+# Google credentials
+*.json
+
+# Model files (too large for git)
+*.h5
+*.keras
+
+# Data folders (too large for git)
+data/
+
+# VS Code
+.vscode/
+
+# Conda
+*.conda
