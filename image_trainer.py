@@ -105,9 +105,9 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, required=True, help="Path to dataset directory")
     parser.add_argument("--credentials", type=str, default="credentials.json", help="Path to Google Cloud credentials")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for training")
-    parser.add_argument("--epochs", type=int, default=10,help="Number of training epochs")
+    parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs")
     parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
-    parser.add_argument("--output", type=str, default="deepfake_model.pth", help="Output model path")
+    parser.add_argument("--output", type=str, default="image_model.pth", help="Output model path")
     
     args = parser.parse_args()
     

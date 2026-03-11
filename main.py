@@ -10,7 +10,6 @@ import argparse
 from torchvision import models
 import os
 import mimetypes
-#from video_trainer import VideoDeepfakeDetectionPipeline
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
@@ -204,7 +203,6 @@ class DeepfakeImagePreprocessor:
         image_tensors = []
         feature_vectors = []
         
-        print(f"Processing {len(frames)} frames through Vision API (Watch your API quota!)...")
         for pil_image, img_bytes in frames:
             # Extract features and process exactly like a single image
             vision_features = self.extract_vision_features(img_bytes)
@@ -270,6 +268,48 @@ class DeepfakeDetector(nn.Module):
         
         return confidence
 
+class VideoDeepfakeDetector(nn.Module):
+    """A simple sequence model that fuses frame-level features with Vision API features and
+    passes them through an LSTM before making a binary prediction."""
+
+    def __init__(self, num_vision_features=5, dropout_rate=0.3, lstm_hidden=256, lstm_layers=1):
+        super(VideoDeepfakeDetector, self).__init__()
+
+        # base image feature extractor (EfficientNet-B0 as in main.py)
+        self.efficientnet = torch.hub.load('pytorch/vision:v0.16.1', 'efficientnet_b0', pretrained=True)
+        # classifier is a two-layer Sequential in the hub model; pull out feature size
+        num_eff_features = self.efficientnet.classifier[1].in_features
+        self.efficientnet.classifier = nn.Identity()
+
+        # sequence model
+        self.lstm = nn.LSTM(
+            input_size=num_eff_features + num_vision_features,
+            hidden_size=lstm_hidden,
+            num_layers=lstm_layers,
+            batch_first=True,
+        )
+
+        # final classification head
+        self.classifier = nn.Sequential(
+            nn.Linear(lstm_hidden, 128),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(128, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, image_seq, vision_seq):
+        # image_seq: (batch, seq, 3, H, W)
+        # vision_seq: (batch, seq, features)
+        b, s, c, h, w = image_seq.shape
+        x = image_seq.view(b * s, c, h, w)
+        feats = self.efficientnet(x)  # (b*s, eff_feat)
+        feats = feats.view(b, s, -1)
+        combined = torch.cat([feats, vision_seq], dim=2)
+        lstm_out, (hn, cn) = self.lstm(combined)
+        last_hidden = hn[-1]  # (batch, hidden)
+        out = self.classifier(last_hidden)
+        return out
 
 class DeepfakeDetectionPipeline:
     
@@ -328,6 +368,45 @@ class DeepfakeDetectionPipeline:
             'num_faces_detected': len(preprocessed['vision_features']['faces']),
             'original_size': preprocessed['original_size']
         }
+
+
+class VideoDeepfakeDetectionPipeline:
+    """Pipeline for running inference on video files."""
+
+    def __init__(self, credentials_path="", model_path=None, device=None):
+        self.preprocessor = DeepfakeImagePreprocessor(credentials_path)
+        if device is None:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = device
+
+        self.model = VideoDeepfakeDetector()
+        if model_path:
+            self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+            print(f"Loaded video model weights from {model_path}")
+        else:
+            print("Warning: No video model weights provided. Using randomly initialized weights.")
+
+        self.model.to(self.device)
+        self.model.eval()
+
+    def predict(self, video_path, threshold=0.5, num_frames=10):
+        processed = self.preprocessor.process_video(video_path, num_frames=num_frames)
+        image_seq = processed['image_tensor_seq'].to(self.device)
+        vision_seq = processed['feature_vector_seq'].to(self.device)
+
+        with torch.no_grad():
+            confidence = self.model(image_seq, vision_seq)
+            confidence_score = confidence.item()
+
+        is_deepfake = confidence_score > threshold
+        return {
+            'confidence_score': confidence_score,
+            'is_deepfake': is_deepfake,
+            'classification': 'DEEPFAKE' if is_deepfake else 'REAL',
+            'threshold': threshold,
+            'frames_analyzed': processed['num_frames_processed']
+        }
     
 def train_model(train_data_loader, val_data_loader, num_epochs=10, learning_rate=0.0001, save_path="deepfake_model.pth"):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -380,11 +459,12 @@ def train_model(train_data_loader, val_data_loader, num_epochs=10, learning_rate
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Deepfake detection using pre-trained model")  
-    parser.add_argument("file_path", type=str, help="Path to the input image")
+    parser = argparse.ArgumentParser(description="Deepfake detection using pre-trained model")
+    parser.add_argument("file_path", type=str, help="Path to the input file (image or video)")
     parser.add_argument("--credentials", type=str, default="", help="Path to Google Cloud credentials")
-    parser.add_argument("--model", type=str, default=None, help="Path to trained model weights")
+    parser.add_argument("--model", type=str, default=None, help="Path to trained model weights (for both image and video)")
     parser.add_argument("--threshold", type=float, default=0.5, help="Classification threshold (0-1)")
+    parser.add_argument("--frames", type=int, default=10, help="Number of frames to sample from video if input is a video")
     args = parser.parse_args()
     
     # Check if the file is an image or a video
@@ -396,7 +476,7 @@ if __name__ == "__main__":
             print("\n🎥 Video file detected. Initializing LSTM Video Pipeline...")
             pipeline = VideoDeepfakeDetectionPipeline(
                 credentials_path=args.credentials,
-                model_path=args.video_model
+                model_path=args.model
             )
             result = pipeline.predict(args.file_path, threshold=args.threshold, num_frames=args.frames)
             print_type = "Video"
@@ -415,12 +495,12 @@ if __name__ == "__main__":
         print(f"File: {args.file_path} ({print_type})")
         print(f"Classification: {result['classification']}")
         print(f"Confidence Score: {result['confidence_score']:.4f}")
-        print(f"Faces Detected: {result['num_faces_detected']}")
-        print(f"Original Size: {result['original_size']}")
-        
-        if is_video:
+        if not is_video:
+            print(f"Faces Detected: {result['num_faces_detected']}")
+            print(f"Original Size: {result['original_size']}")
+        else:
             print(f"Frames Analyzed: {result['frames_analyzed']}")
-            
+        
         print("="*50)
         
         if result['is_deepfake']:
