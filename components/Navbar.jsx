@@ -7,6 +7,7 @@ export default function Navbar() {
 
   const navLinks = [
     { label: 'Scan', href: '/' },
+    { label: 'Game', href: '/game' },
     { label: 'Results', href: '/results' },
     { label: 'Settings', href: '/settings' },
   ]
@@ -16,8 +17,8 @@ export default function Navbar() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '0 2.5rem',
-      height: '72px',
+      padding: '0 3rem',
+      height: '82px',
       backgroundColor: '#ffffff',
       borderBottom: '1px solid #e2e8f0',
       position: 'fixed',
@@ -26,22 +27,22 @@ export default function Navbar() {
       boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
     }}>
       <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: '1.5rem', fontWeight: '900', color: '#1e3a8a' }}>
-          Deep<span style={{ color: '#2563eb' }}>Guard</span>
+        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: '1.72rem', fontWeight: '900', color: '#12306b' }}>
+          Deep<span style={{ color: '#2454b8' }}>Guard</span>
         </span>
       </Link>
 
-      <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '2.3rem', alignItems: 'center' }}>
         {navLinks.map((link) => (
           <Link key={link.href} href={link.href} style={{
             textDecoration: 'none',
-            color: pathname === link.href ? '#1e3a8a' : '#64748b',
-            fontSize: '0.95rem',
+            color: pathname === link.href ? '#12306b' : '#64748b',
+            fontSize: '1.02rem',
             fontWeight: '600',
             letterSpacing: '0.5px',
             textTransform: 'uppercase',
-            borderBottom: pathname === link.href ? '2px solid #1e3a8a' : '2px solid transparent',
-            paddingBottom: '4px',
+            borderBottom: pathname === link.href ? '2px solid #12306b' : '2px solid transparent',
+            paddingBottom: '5px',
             transition: 'color 0.2s',
             fontFamily: "'Jost', sans-serif",
           }}>
@@ -51,19 +52,20 @@ export default function Navbar() {
 
         <Link href="/auth" style={{ textDecoration: 'none' }}>
           <button style={{
-            backgroundColor: '#1e3a8a',
+            background: 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)',
             border: 'none',
             color: '#ffffff',
-            padding: '0.5rem 1.4rem',
-            borderRadius: '8px',
+            padding: '0.68rem 1.65rem',
+            borderRadius: '10px',
             cursor: 'pointer',
-            fontSize: '0.9rem',
+            fontSize: '0.98rem',
             fontWeight: '700',
             fontFamily: "'Jost', sans-serif",
             transition: 'background 0.2s',
+            boxShadow: '0 10px 20px rgba(15, 37, 87, 0.18)',
           }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#1e40af'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#1e3a8a'}
+            onMouseEnter={e => e.currentTarget.style.background = 'linear-gradient(135deg, #163d86 0%, #2454b8 100%)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)'}
           >
             Login
           </button>

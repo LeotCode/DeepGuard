@@ -22,16 +22,16 @@ export default function ScrollingBar() {
       backgroundColor: '#f8fafc',
       borderTop: '1px solid #e2e8f0',
       overflow: 'hidden',
-      padding: '1rem 0',
+      padding: '1.3rem 0 1.15rem',
       fontFamily: "'Jost', sans-serif",
     }}>
       <p style={{
         textAlign: 'center',
         color: '#94a3b8',
-        fontSize: '0.65rem',
+        fontSize: '0.78rem',
         letterSpacing: '3px',
         textTransform: 'uppercase',
-        margin: '0 0 0.85rem 0',
+        margin: '0 0 1rem 0',
         fontFamily: "'Jost', sans-serif",
         fontWeight: '700',
       }}>
@@ -41,7 +41,7 @@ export default function ScrollingBar() {
       <div style={{ overflow: 'hidden', width: '100%' }}>
         <div style={{
           display: 'flex',
-          gap: '1.25rem',
+          gap: '1.5rem',
           animation: 'scroll 40s linear infinite',
           width: 'max-content',
         }}>
@@ -51,17 +51,17 @@ export default function ScrollingBar() {
             return (
               <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                 <div style={{
-                  width: '90px',
-                  height: '90px',
-                  borderRadius: '10px',
+                  width: '110px',
+                  height: '110px',
+                  borderRadius: '12px',
                   overflow: 'hidden',
                   border: `2px solid ${color}55`,
-                  boxShadow: `0 2px 10px ${color}22`,
+                  boxShadow: `0 4px 14px ${color}22`,
                 }}>
                   <img src={item.src} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <span style={{
-                  fontSize: '0.65rem',
+                  fontSize: '0.78rem',
                   fontWeight: '800',
                   letterSpacing: '2px',
                   color,

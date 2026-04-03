@@ -24,16 +24,16 @@ function RiskIcon({ score, size = 20 }) {
 }
 
 function Card({ children, style = {} }) {
-  return <div style={{ backgroundColor: BG, border: `1px solid ${BORDER}`, borderRadius: '16px', overflow: 'hidden', marginBottom: '1.25rem', boxShadow: '0 2px 12px rgba(30,58,138,0.06)', fontFamily: FONT, ...style }}>{children}</div>
+  return <div style={{ backgroundColor: BG, border: `1px solid ${BORDER}`, borderRadius: '20px', overflow: 'hidden', marginBottom: '1.5rem', boxShadow: '0 8px 24px rgba(30,58,138,0.08)', fontFamily: FONT, ...style }}>{children}</div>
 }
 function CardHeader({ children }) {
-  return <div style={{ padding: '1.1rem 1.5rem', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>{children}</div>
+  return <div style={{ padding: '1.35rem 1.8rem', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>{children}</div>
 }
 function CardTitle({ children }) {
-  return <p style={{ margin: 0, fontWeight: '700', fontSize: '1rem', color: TEXT, fontFamily: FONT }}>{children}</p>
+  return <p style={{ margin: 0, fontWeight: '700', fontSize: '1.15rem', color: TEXT, fontFamily: FONT }}>{children}</p>
 }
 function CardBody({ children }) {
-  return <div style={{ padding: '1.25rem 1.5rem' }}>{children}</div>
+  return <div style={{ padding: '1.6rem 1.8rem' }}>{children}</div>
 }
 
 function ScoreDisplay({ result }) {
@@ -59,42 +59,42 @@ function ScoreDisplay({ result }) {
   return (
     <Card>
       <CardBody>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: '2.5rem', alignItems: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{ position: 'relative', width: '200px', height: '200px' }}>
-              <svg style={{ transform: 'rotate(-90deg)', width: '200px', height: '200px' }} viewBox="0 0 200 200">
+            <div style={{ position: 'relative', width: '240px', height: '240px' }}>
+              <svg style={{ transform: 'rotate(-90deg)', width: '240px', height: '240px' }} viewBox="0 0 200 200">
                 <circle cx="100" cy="100" r="88" stroke={BORDER} strokeWidth="10" fill="none" />
                 <circle cx="100" cy="100" r="88" stroke={cfg.scoreColor} strokeWidth="10" fill="none" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.05s linear' }} />
               </svg>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: cfg.scoreColor }}><RiskIcon score={result.ai_score} size={28} /></span>
-                <span style={{ fontSize: '3rem', fontWeight: '900', color: TEXT, lineHeight: 1, marginTop: '4px', fontFamily: FONT }}>{animScore}</span>
-                <span style={{ fontSize: '0.9rem', color: MUTED, fontFamily: FONT }}>% AI</span>
+                <span style={{ color: cfg.scoreColor }}><RiskIcon score={result.ai_score} size={34} /></span>
+                <span style={{ fontSize: '3.6rem', fontWeight: '900', color: TEXT, lineHeight: 1, marginTop: '6px', fontFamily: FONT }}>{animScore}</span>
+                <span style={{ fontSize: '1.02rem', color: MUTED, fontFamily: FONT }}>% AI</span>
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.45rem' }}>
             <div>
-              <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.75rem', fontWeight: '800', color: TEXT, fontFamily: FONT }}>{cfg.likelihood}</h2>
-              <p style={{ margin: 0, color: MUTED, lineHeight: 1.6, fontSize: '0.9rem', fontFamily: FONT }}>{cfg.description}</p>
+              <h2 style={{ margin: '0 0 0.65rem', fontSize: '2rem', fontWeight: '800', color: TEXT, fontFamily: FONT }}>{cfg.likelihood}</h2>
+              <p style={{ margin: 0, color: MUTED, lineHeight: 1.7, fontSize: '1.02rem', fontFamily: FONT }}>{cfg.description}</p>
             </div>
 
-            <div style={{ backgroundColor: cfg.badgeBg, border: `1px solid ${BORDER}`, borderRadius: '10px', padding: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', color: MUTED, fontFamily: FONT }}>Confidence Level</span>
-                <span style={{ fontSize: '1rem', fontWeight: '700', color: cfg.scoreColor, fontFamily: FONT }}>{result.confidence}%</span>
+            <div style={{ backgroundColor: cfg.badgeBg, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '1.2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+                <span style={{ fontSize: '0.9rem', color: MUTED, fontFamily: FONT }}>Confidence Level</span>
+                <span style={{ fontSize: '1.12rem', fontWeight: '700', color: cfg.scoreColor, fontFamily: FONT }}>{result.confidence}%</span>
               </div>
-              <div style={{ height: '6px', backgroundColor: BORDER, borderRadius: '99px', overflow: 'hidden' }}>
+              <div style={{ height: '8px', backgroundColor: BORDER, borderRadius: '99px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${result.confidence}%`, backgroundColor: cfg.scoreColor, borderRadius: '99px', transition: 'width 1s ease' }} />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
               {[{ label: 'Media Type', value: result.file_type || 'Image', color: TEXT }, { label: 'Analysis Status', value: 'Complete', color: '#22c55e' }].map(({ label, value, color }) => (
-                <div key={label} style={{ backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '10px', padding: '0.85rem 1rem' }}>
-                  <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: MUTED, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: FONT }}>{label}</p>
-                  <p style={{ margin: 0, fontWeight: '700', color, fontSize: '1rem', textTransform: 'capitalize', fontFamily: FONT }}>{value}</p>
+                <div key={label} style={{ backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '12px', padding: '1rem 1.1rem' }}>
+                  <p style={{ margin: '0 0 5px', fontSize: '0.78rem', color: MUTED, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: FONT }}>{label}</p>
+                  <p style={{ margin: 0, fontWeight: '700', color, fontSize: '1.08rem', textTransform: 'capitalize', fontFamily: FONT }}>{value}</p>
                 </div>
               ))}
             </div>
@@ -123,9 +123,9 @@ function TimelineGraph({ data }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle>Temporal Analysis — AI Detection Over Time</CardTitle><span style={{ fontSize: '0.78rem', color: MUTED, fontFamily: FONT }}>Shows AI patterns over scan duration</span></CardHeader>
+      <CardHeader><CardTitle>Temporal Analysis — AI Detection Over Time</CardTitle><span style={{ fontSize: '0.88rem', color: MUTED, fontFamily: FONT }}>Shows AI patterns over scan duration</span></CardHeader>
       <CardBody>
-        <ResponsiveContainer width="100%" height={240}>
+        <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="aiGrad" x1="0" y1="0" x2="0" y2="1">
@@ -134,18 +134,18 @@ function TimelineGraph({ data }) {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-            <XAxis dataKey="timestamp" tickFormatter={fmt} stroke={MUTED} tick={{ fontSize: 11, fill: MUTED, fontFamily: FONT }} />
-            <YAxis domain={[0, 100]} stroke={MUTED} tick={{ fontSize: 11, fill: MUTED, fontFamily: FONT }} label={{ value: 'AI Likelihood (%)', angle: -90, position: 'insideLeft', fill: MUTED, fontSize: 11 }} />
+            <XAxis dataKey="timestamp" tickFormatter={fmt} stroke={MUTED} tick={{ fontSize: 12, fill: MUTED, fontFamily: FONT }} />
+            <YAxis domain={[0, 100]} stroke={MUTED} tick={{ fontSize: 12, fill: MUTED, fontFamily: FONT }} label={{ value: 'AI Likelihood (%)', angle: -90, position: 'insideLeft', fill: MUTED, fontSize: 12 }} />
             <Tooltip content={<CustomTooltip />} />
-            <Area type="monotone" dataKey="ai_likelihood" stroke={NAVY} strokeWidth={2} fill="url(#aiGrad)" />
+            <Area type="monotone" dataKey="ai_likelihood" stroke={NAVY} strokeWidth={3} fill="url(#aiGrad)" />
           </AreaChart>
         </ResponsiveContainer>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.75rem', marginTop: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.9rem', marginTop: '1.5rem' }}>
           {[{ label: 'Average', value: `${avg}%`, color: TEXT }, { label: 'Peak', value: `${peak}%`, color: '#ef4444' }, { label: 'Lowest', value: `${low}%`, color: '#22c55e' }].map(({ label, value, color }) => (
-            <div key={label} style={{ backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '10px', padding: '0.75rem 1rem', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: MUTED, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: FONT }}>{label}</p>
-              <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color, fontFamily: FONT }}>{value}</p>
+            <div key={label} style={{ backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '12px', padding: '0.95rem 1.1rem', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 5px', fontSize: '0.78rem', color: MUTED, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: FONT }}>{label}</p>
+              <p style={{ margin: 0, fontSize: '1.28rem', fontWeight: '700', color, fontFamily: FONT }}>{value}</p>
             </div>
           ))}
         </div>
@@ -163,15 +163,15 @@ function HeatmapDisplay({ fileUrl, regions }) {
       <CardHeader>
         <div>
           <CardTitle>Spatial Heatmap Analysis</CardTitle>
-          <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: MUTED, fontFamily: FONT }}>Highlighted regions show potential AI manipulation</p>
+          <p style={{ margin: '2px 0 0', fontSize: '0.9rem', color: MUTED, fontFamily: FONT }}>Highlighted regions show potential AI manipulation</p>
         </div>
-        <button onClick={() => setShow(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: SURFACE, border: `1px solid ${BORDER}`, color: MUTED, borderRadius: '8px', padding: '0.4rem 0.9rem', cursor: 'pointer', fontSize: '0.8rem', fontFamily: FONT, fontWeight: '600' }}>
+        <button onClick={() => setShow(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: SURFACE, border: `1px solid ${BORDER}`, color: MUTED, borderRadius: '10px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.9rem', fontFamily: FONT, fontWeight: '600' }}>
           {show ? 'Hide' : 'Show'}
         </button>
       </CardHeader>
       <CardBody>
-        <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', backgroundColor: SURFACE, border: `1px solid ${BORDER}`, maxHeight: '340px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {fileUrl ? <img src={fileUrl} alt="Analysis" style={{ width: '100%', maxHeight: '340px', objectFit: 'contain', display: 'block' }} /> : <div style={{ height: '240px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: '0.85rem', fontFamily: FONT }}>No image preview</div>}
+        <div style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', backgroundColor: SURFACE, border: `1px solid ${BORDER}`, maxHeight: '420px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {fileUrl ? <img src={fileUrl} alt="Analysis" style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', display: 'block' }} /> : <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: '0.95rem', fontFamily: FONT }}>No image preview</div>}
           {show && (
             <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
               {regions.map((r, i) => { const c = getColor(r.intensity); return <rect key={i} x={`${r.x}%`} y={`${r.y}%`} width={`${r.width}%`} height={`${r.height}%`} fill={c.fill} stroke={c.stroke} strokeWidth="2" /> })}
@@ -179,20 +179,20 @@ function HeatmapDisplay({ fileUrl, regions }) {
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '1.75rem', marginTop: '1.2rem' }}>
           {[{ color: '#ef4444', bg: 'rgba(239,68,68,0.2)', label: 'High' }, { color: '#f59e0b', bg: 'rgba(245,158,11,0.2)', label: 'Medium' }, { color: '#22c55e', bg: 'rgba(34,197,94,0.2)', label: 'Low' }].map(({ color, bg, label }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '14px', height: '14px', borderRadius: '3px', backgroundColor: bg, border: `2px solid ${color}` }} />
-              <span style={{ fontSize: '0.8rem', color: MUTED, fontFamily: FONT }}>{label}</span>
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: bg, border: `2px solid ${color}` }} />
+              <span style={{ fontSize: '0.92rem', color: MUTED, fontFamily: FONT }}>{label}</span>
             </div>
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem', marginTop: '1.2rem' }}>
           {[{ label: 'Total Regions', value: regions.length, color: TEXT }, { label: 'High Risk Areas', value: regions.filter(r => r.intensity >= 0.7).length, color: '#ef4444' }].map(({ label, value, color }) => (
-            <div key={label} style={{ backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '10px', padding: '0.85rem 1rem' }}>
-              <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: MUTED, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: FONT }}>{label}</p>
-              <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: '700', color, fontFamily: FONT }}>{value}</p>
+            <div key={label} style={{ backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '12px', padding: '1rem 1.1rem' }}>
+              <p style={{ margin: '0 0 5px', fontSize: '0.78rem', color: MUTED, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: FONT }}>{label}</p>
+              <p style={{ margin: 0, fontSize: '1.7rem', fontWeight: '700', color, fontFamily: FONT }}>{value}</p>
             </div>
           ))}
         </div>
@@ -213,11 +213,11 @@ function RedFlagsList({ flags }) {
       <CardBody>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           {flags.length === 0
-            ? <p style={{ textAlign: 'center', color: MUTED, padding: '1rem 0', fontSize: '0.85rem', fontFamily: FONT }}>No suspicious indicators found</p>
+            ? <p style={{ textAlign: 'center', color: MUTED, padding: '1.1rem 0', fontSize: '0.95rem', fontFamily: FONT }}>No suspicious indicators found</p>
             : flags.map((flag, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px' }}>
-                <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0, marginTop: '5px' }} />
-                <p style={{ margin: 0, color: TEXT, fontSize: '0.88rem', lineHeight: 1.55, fontFamily: FONT }}>{flag}</p>
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '0.95rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0, marginTop: '7px' }} />
+                <p style={{ margin: 0, color: TEXT, fontSize: '1rem', lineHeight: 1.65, fontFamily: FONT }}>{flag}</p>
               </div>
             ))
           }
@@ -231,7 +231,7 @@ function AnalysisSummary({ summary }) {
   return (
     <Card>
       <CardHeader><CardTitle>Analysis Summary</CardTitle></CardHeader>
-      <CardBody><p style={{ margin: 0, color: MUTED, lineHeight: 1.7, fontSize: '0.9rem', fontFamily: FONT }}>{summary}</p></CardBody>
+      <CardBody><p style={{ margin: 0, color: MUTED, lineHeight: 1.8, fontSize: '1.02rem', fontFamily: FONT }}>{summary}</p></CardBody>
     </Card>
   )
 }
@@ -244,12 +244,12 @@ function FileDetails({ result }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           {[{ label: 'Type', value: result.file_type || 'Image' }, { label: 'Confidence', value: `${result.confidence}%` }, { label: 'Faces Detected', value: result.total_faces }].map(({ label, value }) => (
             <div key={label}>
-              <p style={{ margin: '0 0 2px', fontSize: '0.75rem', color: MUTED, fontFamily: FONT }}>{label}</p>
-              <p style={{ margin: 0, fontWeight: '700', color: TEXT, textTransform: 'capitalize', fontFamily: FONT }}>{value}</p>
+              <p style={{ margin: '0 0 3px', fontSize: '0.82rem', color: MUTED, fontFamily: FONT }}>{label}</p>
+              <p style={{ margin: 0, fontWeight: '700', color: TEXT, textTransform: 'capitalize', fontSize: '1.04rem', fontFamily: FONT }}>{value}</p>
             </div>
           ))}
           {result.file_url && (
-            <button onClick={() => window.open(result.file_url, '_blank')} style={{ marginTop: '0.25rem', width: '100%', padding: '0.65rem', backgroundColor: NAVY, color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontFamily: FONT, fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <button onClick={() => window.open(result.file_url, '_blank')} style={{ marginTop: '0.35rem', width: '100%', padding: '0.8rem', backgroundColor: NAVY, color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '0.95rem', fontFamily: FONT, fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               View Original File
             </button>
           )}
@@ -267,21 +267,21 @@ export default function ScanResult({ result }) {
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: '1100px', marginTop: '1rem', fontFamily: FONT }}>
+    <div style={{ width: '100%', maxWidth: '1260px', marginTop: '1.25rem', fontFamily: FONT }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.8rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ margin: '0 0 4px', fontSize: '1.6rem', fontWeight: '800', color: TEXT, fontFamily: FONT }}>{result.file_name || 'Scan Result'}</h1>
-          <p style={{ margin: 0, color: MUTED, fontSize: '0.85rem', fontFamily: FONT }}>Analyzed on {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+          <h1 style={{ margin: '0 0 6px', fontSize: '2rem', fontWeight: '800', color: TEXT, fontFamily: FONT }}>{result.file_name || 'Scan Result'}</h1>
+          <p style={{ margin: 0, color: MUTED, fontSize: '0.96rem', fontFamily: FONT }}>Analyzed on {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: cfg.badgeBg, border: `1px solid ${cfg.badgeColor}44`, borderRadius: '99px', padding: '0.4rem 1rem', color: cfg.badgeColor, fontSize: '0.85rem', fontWeight: '700', fontFamily: FONT }}>
-          <RiskIcon score={result.ai_score} size={15} />{cfg.label}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: cfg.badgeBg, border: `1px solid ${cfg.badgeColor}44`, borderRadius: '99px', padding: '0.55rem 1.15rem', color: cfg.badgeColor, fontSize: '0.94rem', fontWeight: '700', fontFamily: FONT }}>
+          <RiskIcon score={result.ai_score} size={17} />{cfg.label}
         </div>
       </div>
 
       <ScoreDisplay result={result} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.25rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.5rem', alignItems: 'start' }}>
         <div>
           {result.temporal_data?.length > 0 && <TimelineGraph data={result.temporal_data} />}
           {result.heatmap_regions?.length > 0 && <HeatmapDisplay fileUrl={result.file_url} regions={result.heatmap_regions} />}
