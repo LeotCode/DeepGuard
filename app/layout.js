@@ -1,10 +1,32 @@
+'use client'
 import Navbar from '@/components/Navbar'
 import ScrollingBar from '@/components/ScrollingBar'
 import { ResultsProvider } from '@/context/ResultsContext'
+import { ThemeProvider, useTheme } from '@/context/ThemeContext'
 
-export const metadata = {
-  title: 'DeepGuard',
-  description: 'AI-powered deepfake detection',
+function AppContent({ children }) {
+  const { theme } = useTheme()
+
+  return (
+    <body style={{
+      margin: 0,
+      background: theme.bg,
+      color: theme.text,
+      fontFamily: "'Jost', sans-serif",
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      transition: 'background-color 0.3s ease, color 0.3s ease'
+    }}>
+      <ResultsProvider>
+        <Navbar />
+        <main style={{ paddingTop: '72px', flex: 1 }}>
+          {children}
+        </main>
+        <ScrollingBar />
+      </ResultsProvider>
+    </body>
+  )
 }
 
 export default function RootLayout({ children }) {
@@ -17,26 +39,11 @@ export default function RootLayout({ children }) {
         />
         <style>{`
           *, *::before, *::after { box-sizing: border-box; }
-          html, body { margin: 0; padding: 0; background: #f4f6fb; }
         `}</style>
       </head>
-      <body style={{
-        margin: 0,
-        background: '#f4f6fb',
-        color: '#0f172a',
-        fontFamily: "'Jost', sans-serif",
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        <ResultsProvider>
-          <Navbar />
-          <main style={{ paddingTop: '72px', flex: 1 }}>
-            {children}
-          </main>
-          <ScrollingBar />
-        </ResultsProvider>
-      </body>
+      <ThemeProvider>
+        <AppContent>{children}</AppContent>
+      </ThemeProvider>
     </html>
   )
 }

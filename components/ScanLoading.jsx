@@ -1,12 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-
-const NAVY  = '#1e3a8a'
-const BLUE  = '#2563eb'
-const MUTED = '#64748b'
-const TEXT  = '#0f172a'
-const BG    = '#ffffff'
-const TRACK = '#e2e8f0'
+import { useTheme } from '@/context/ThemeContext'
 
 const STAGES = [
   { label: 'Preprocessing image',        from: 0,  to: 18 },
@@ -18,6 +12,7 @@ const STAGES = [
 ]
 
 export default function ScanLoading({ scanDone, onComplete }) {
+  const { theme } = useTheme()
   const [progress, setProgress]     = useState(0)
   const [stageIndex, setStageIndex] = useState(0)
   const currentRef    = useRef(0)
@@ -66,26 +61,26 @@ export default function ScanLoading({ scanDone, onComplete }) {
 
   return (
     <div style={{ width: '100%', maxWidth: '760px', marginTop: '1.5rem', fontFamily: "'Jost', sans-serif" }}>
-      <div style={{ backgroundColor: BG, border: '1px solid #e2e8f0', borderRadius: '16px', padding: '2.5rem 2.5rem 2rem', boxShadow: '0 4px 24px rgba(30,58,138,0.08)' }}>
+      <div style={{ backgroundColor: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '2.5rem 2.5rem 2rem', boxShadow: theme.boxShadow, transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease' }}>
 
         {/* Top row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
           <div>
-            <p style={{ margin: '0 0 0.2rem', fontSize: '0.7rem', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: MUTED }}>
+            <p style={{ margin: '0 0 0.2rem', fontSize: '0.7rem', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: theme.muted, transition: 'color 0.3s ease' }}>
               Scanning
             </p>
-            <p style={{ margin: 0, fontSize: '1.05rem', fontWeight: '600', color: TEXT, minHeight: '1.5rem' }}>
+            <p style={{ margin: 0, fontSize: '1.05rem', fontWeight: '600', color: theme.text, minHeight: '1.5rem', transition: 'color 0.3s ease' }}>
               {currentStage.label}
             </p>
           </div>
-          <span style={{ fontSize: '2.5rem', fontWeight: '900', color: NAVY, letterSpacing: '-1px', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: '2.5rem', fontWeight: '900', color: theme.primary, letterSpacing: '-1px', lineHeight: 1, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s ease' }}>
             {progress}%
           </span>
         </div>
 
         {/* Progress track */}
-        <div style={{ width: '100%', height: '8px', backgroundColor: TRACK, borderRadius: '99px', overflow: 'hidden', marginBottom: '1.5rem' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: `linear-gradient(90deg, ${NAVY}, ${BLUE})`, borderRadius: '99px', transition: 'width 0.1s linear' }} />
+        <div style={{ width: '100%', height: '8px', backgroundColor: theme.border, borderRadius: '99px', overflow: 'hidden', marginBottom: '1.5rem', transition: 'background-color 0.3s ease' }}>
+          <div style={{ height: '100%', width: `${progress}%`, background: `linear-gradient(90deg, ${theme.primary}, ${theme.primary})`, borderRadius: '99px', transition: 'width 0.1s linear' }} />
         </div>
 
         {/* Stage dots */}
@@ -94,8 +89,8 @@ export default function ScanLoading({ scanDone, onComplete }) {
             const done   = i < stageIndex
             const active = i === stageIndex
             return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: done ? NAVY : active ? TEXT : '#cbd5e1', fontWeight: active ? '700' : '400', transition: 'color 0.3s' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: done ? NAVY : active ? BLUE : '#cbd5e1', flexShrink: 0, transition: 'background-color 0.3s' }} />
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: done ? theme.primary : active ? theme.text : '#cbd5e1', fontWeight: active ? '700' : '400', transition: 'color 0.3s' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: done ? theme.primary : active ? theme.primary : '#cbd5e1', flexShrink: 0, transition: 'background-color 0.3s' }} />
                 {stage.label}
                 {i < STAGES.length - 1 && <span style={{ color: '#e2e8f0', margin: '0 2px' }}>·</span>}
               </div>
@@ -104,7 +99,7 @@ export default function ScanLoading({ scanDone, onComplete }) {
         </div>
 
         {/* Pulse bar */}
-        <div style={{ marginTop: '2rem', height: '3px', background: `linear-gradient(90deg, transparent, ${NAVY}, transparent)`, borderRadius: '99px', animation: 'pulse-bar 1.6s ease-in-out infinite' }} />
+        <div style={{ marginTop: '2rem', height: '3px', background: `linear-gradient(90deg, transparent, ${theme.primary}, transparent)`, borderRadius: '99px', animation: 'pulse-bar 1.6s ease-in-out infinite' }} />
       </div>
 
       <style>{`

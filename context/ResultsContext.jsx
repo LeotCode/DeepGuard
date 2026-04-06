@@ -1,16 +1,16 @@
 'use client'
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState } from 'react'
 
 const ResultsContext = createContext()
 
 export function ResultsProvider({ children }) {
-  const [results, setResults] = useState([])
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('deepguard_results')
-    if (stored) setResults(JSON.parse(stored))
-  }, [])
+  const [results, setResults] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('deepguard_results')
+      return stored ? JSON.parse(stored) : []
+    }
+    return []
+  })
 
   const addResult = (result) => {
     const updated = [result, ...results]

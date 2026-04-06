@@ -1,14 +1,10 @@
 'use client'
 import { useState } from 'react'
+import { useTheme } from '@/context/ThemeContext'
 
-const NAVY = '#12306b'
-const TEXT = '#eff6ff'
-const MUTED = '#cbd5e1'
-const BORDER = 'rgba(148, 163, 184, 0.2)'
 const FONT = "'Jost', sans-serif"
 const DEEP_GRADIENT = 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)'
 const DEEP_GRADIENT_HOVER = 'linear-gradient(135deg, #163d86 0%, #2454b8 100%)'
-const CARD_GRADIENT = 'radial-gradient(circle at top left, rgba(96, 165, 250, 0.22), transparent 30%), linear-gradient(145deg, #071a3d 0%, #0f2557 48%, #163d86 100%)'
 
 const GAME_IMAGES = [
   {
@@ -29,6 +25,7 @@ const GAME_IMAGES = [
 ]
 
 export default function DeepfakeGame() {
+  const { theme } = useTheme()
   const [gameIndex, setGameIndex] = useState(0)
   const [gameResult, setGameResult] = useState(null)
   const currentGameImage = GAME_IMAGES[gameIndex]
@@ -50,18 +47,36 @@ export default function DeepfakeGame() {
   }
 
   return (
-    <div style={{ background: CARD_GRADIENT, borderRadius: '28px', border: `1px solid ${BORDER}`, boxShadow: '0 24px 48px rgba(15, 23, 42, 0.18)', padding: '2.4rem', maxWidth: '1100px', margin: '0 auto' }}>
-      <p style={{ color: '#93c5fd', fontSize: '1.08rem', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase', margin: '0 0 1rem', fontFamily: FONT }}>
-        Deepfakes often decieve the naked eye
+    <div style={{
+      background: theme.cardBg,
+      borderRadius: '28px',
+      border: `1px solid ${theme.border}`,
+      boxShadow: theme.boxShadow,
+      padding: '2.4rem',
+      maxWidth: '1100px',
+      margin: '0 auto',
+      transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease'
+    }}>
+      <p style={{ color: theme.primary, fontSize: '1.08rem', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase', margin: '0 0 1rem', fontFamily: FONT }}>
+        Deepfakes often deceive the naked eye
       </p>
-      <h2 style={{ margin: '0 0 1.1rem', fontSize: '2.15rem', fontWeight: '900', color: TEXT, fontFamily: FONT }}>
+      <h2 style={{ margin: '0 0 1.1rem', fontSize: '2.15rem', fontWeight: '900', color: theme.text, fontFamily: FONT }}>
         Can You Spot The Deepfake?
       </h2>
-      <p style={{ color: MUTED, fontSize: '1.15rem', lineHeight: 1.8, margin: '0 0 1.75rem', maxWidth: '760px', fontFamily: FONT }}>
+      <p style={{ color: theme.muted, fontSize: '1.15rem', lineHeight: 1.8, margin: '0 0 1.75rem', maxWidth: '760px', fontFamily: FONT }}>
         Look at the image, decide whether it is real or fake, and see the answer instantly.
       </p>
 
-      <div style={{ borderRadius: '24px', overflow: 'hidden', background: 'linear-gradient(180deg, rgba(226, 232, 240, 0.9) 0%, rgba(248, 250, 252, 0.92) 100%)', border: '1px solid rgba(255, 255, 255, 0.18)', width: '100%', maxWidth: '460px', aspectRatio: '1 / 1', margin: '0 auto 1.25rem' }}>
+      <div style={{
+        borderRadius: '24px',
+        overflow: 'hidden',
+        background: theme.bg,
+        border: `1px solid ${theme.border}`,
+        width: '100%',
+        maxWidth: '460px',
+        aspectRatio: '1 / 1',
+        margin: '0 auto 1.25rem'
+      }}>
         <img
           src={currentGameImage.src}
           alt="Real or fake challenge"

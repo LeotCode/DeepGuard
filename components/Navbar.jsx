@@ -1,9 +1,11 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTheme } from '@/context/ThemeContext'
 
 export default function Navbar() {
   const pathname = usePathname()
+  const { theme } = useTheme()
 
   const navLinks = [
     { label: 'Scan', href: '/' },
@@ -19,16 +21,16 @@ export default function Navbar() {
       justifyContent: 'space-between',
       padding: '0 3rem',
       height: '82px',
-      backgroundColor: '#ffffff',
-      borderBottom: '1px solid #e2e8f0',
+      backgroundColor: theme.cardBg,
+      borderBottom: `1px solid ${theme.border}`,
       position: 'fixed',
       top: 0, left: 0, right: 0,
       zIndex: 100,
-      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      boxShadow: theme.boxShadow,
     }}>
       <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: '1.72rem', fontWeight: '900', color: '#12306b' }}>
-          Deep<span style={{ color: '#2454b8' }}>Guard</span>
+        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: '1.72rem', fontWeight: '900', color: theme.primary }}>
+          Deep<span style={{ color: theme.primary }}>Guard</span>
         </span>
       </Link>
 
@@ -36,12 +38,12 @@ export default function Navbar() {
         {navLinks.map((link) => (
           <Link key={link.href} href={link.href} style={{
             textDecoration: 'none',
-            color: pathname === link.href ? '#12306b' : '#64748b',
+            color: pathname === link.href ? theme.primary : theme.muted,
             fontSize: '1.02rem',
             fontWeight: '600',
             letterSpacing: '0.5px',
             textTransform: 'uppercase',
-            borderBottom: pathname === link.href ? '2px solid #12306b' : '2px solid transparent',
+            borderBottom: pathname === link.href ? `2px solid ${theme.primary}` : '2px solid transparent',
             paddingBottom: '5px',
             transition: 'color 0.2s',
             fontFamily: "'Jost', sans-serif",

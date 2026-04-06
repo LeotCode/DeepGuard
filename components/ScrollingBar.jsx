@@ -1,4 +1,5 @@
 'use client'
+import { useTheme } from '@/context/ThemeContext'
 
 const examples = [
   { label: 'FAKE', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/400px-Camponotus_flavomarginatus_ant.jpg', name: 'Example 1' },
@@ -16,18 +17,20 @@ const FAKE_COLOR = '#ef4444'
 const REAL_COLOR = '#22c55e'
 
 export default function ScrollingBar() {
+  const { theme } = useTheme()
+
   return (
     <div style={{
       width: '100%',
-      backgroundColor: '#f8fafc',
-      borderTop: '1px solid #e2e8f0',
+      backgroundColor: theme.bg,
+      borderTop: `1px solid ${theme.border}`,
       overflow: 'hidden',
       padding: '1.3rem 0 1.15rem',
       fontFamily: "'Jost', sans-serif",
     }}>
       <p style={{
         textAlign: 'center',
-        color: '#94a3b8',
+        color: theme.muted,
         fontSize: '0.78rem',
         letterSpacing: '3px',
         textTransform: 'uppercase',
