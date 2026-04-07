@@ -2,9 +2,11 @@ venv/
 venv_wsl/
 .env
 __pycache__/
+.vision_cache/
 dataset/
 image_dataset/
 video_dataset/
 face_dataset/
 Dataset_Subfolder/
 test/
+firebase.js
