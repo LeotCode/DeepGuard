@@ -2,10 +2,22 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/context/ThemeContext'
+import { useState, useEffect } from 'react'
+import { auth } from '../firebase'
+import { logout } from '../auth'
+import { onAuthStateChanged } from 'firebase/auth'
 
 export default function Navbar() {
   const pathname = usePathname()
   const { theme } = useTheme()
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser)
+    })
+    return unsubscribe
+  }, [])
 
   const navLinks = [
     { label: 'Scan', href: '/' },
@@ -52,26 +64,49 @@ export default function Navbar() {
           </Link>
         ))}
 
-        <Link href="/auth" style={{ textDecoration: 'none' }}>
-          <button style={{
-            background: 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)',
-            border: 'none',
-            color: '#ffffff',
-            padding: '0.68rem 1.65rem',
-            borderRadius: '10px',
-            cursor: 'pointer',
-            fontSize: '0.98rem',
-            fontWeight: '700',
-            fontFamily: "'Jost', sans-serif",
-            transition: 'background 0.2s',
-            boxShadow: '0 10px 20px rgba(15, 37, 87, 0.18)',
-          }}
+        {user ? (
+          <button
+            onClick={logout}
+            style={{
+              background: 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)',
+              border: 'none',
+              color: '#ffffff',
+              padding: '0.68rem 1.65rem',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '0.98rem',
+              fontWeight: '700',
+              fontFamily: "'Jost', sans-serif",
+              transition: 'background 0.2s',
+              boxShadow: '0 10px 20px rgba(15, 37, 87, 0.18)',
+            }}
             onMouseEnter={e => e.currentTarget.style.background = 'linear-gradient(135deg, #163d86 0%, #2454b8 100%)'}
             onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)'}
           >
-            Login
+            Logout
           </button>
-        </Link>
+        ) : (
+          <Link href="/auth" style={{ textDecoration: 'none' }}>
+            <button style={{
+              background: 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)',
+              border: 'none',
+              color: '#ffffff',
+              padding: '0.68rem 1.65rem',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '0.98rem',
+              fontWeight: '700',
+              fontFamily: "'Jost', sans-serif",
+              transition: 'background 0.2s',
+              boxShadow: '0 10px 20px rgba(15, 37, 87, 0.18)',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'linear-gradient(135deg, #163d86 0%, #2454b8 100%)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)'}
+            >
+              Login
+            </button>
+          </Link>
+        )}
       </div>
     </nav>
   )

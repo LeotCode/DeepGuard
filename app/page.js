@@ -62,7 +62,7 @@ export default function Home() {
     <div style={{ background: theme.bg, minHeight: '100vh', fontFamily: FONT, transition: 'background-color 0.3s ease' }}>
 
       {/* Hero */}
-      <div style={{ maxWidth: '1480px', margin: '0 auto', padding: '5.5rem 2.25rem 2rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1.22fr) minmax(560px, 1.05fr)', gap: '2.5rem', alignItems: 'stretch' }}>
+      <div style={{ maxWidth: '1480px', margin: '0 auto', padding: '2rem 2.25rem 2rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1.22fr) minmax(560px, 1.05fr)', gap: '2.5rem', alignItems: 'stretch' }}>
 
         {/* LEFT */}
         <div style={{ backgroundColor: theme.cardBg, borderRadius: '28px', border: `1px solid ${theme.border}`, boxShadow: theme.boxShadow, padding: '2.5rem', minHeight: '100%', display: 'flex', flexDirection: 'column', transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease' }}>
@@ -71,7 +71,7 @@ export default function Home() {
           </h1>
 
           <p style={{ color: theme.muted, fontSize: '1.18rem', lineHeight: 1.8, margin: '0 0 1.25rem', maxWidth: '620px', fontFamily: FONT, transition: 'color 0.3s ease' }}>
-            Deepfakes are edited or AI-generated images and videos designed to imitate real people. They often look believable because modern tools can mimic skin texture, lighting, and facial structure in seconds.
+            Deepfakes are edited or AI-generated content designed to imitate real people. They often look believable because modern tools can mimic skin texture, lighting, and facial structure in seconds.
           </p>
 
           <p style={{ color: theme.muted, fontSize: '1.18rem', lineHeight: 1.8, margin: '0 0 1.85rem', maxWidth: '620px', fontFamily: FONT, transition: 'color 0.3s ease' }}>
@@ -84,7 +84,7 @@ export default function Home() {
               <img
                 src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80"
                 alt="Real portrait example"
-                style={{ width: '100%', height: '290px', objectFit: 'cover', borderRadius: '18px', display: 'block' }}
+                style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '18px', display: 'block' }}
               />
             </div>
 
@@ -93,7 +93,7 @@ export default function Home() {
               <img
                 src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80&sat=-100&contrast=130&blur=20"
                 alt="Edited portrait example"
-                style={{ width: '100%', height: '290px', objectFit: 'cover', borderRadius: '18px', display: 'block', filter: 'contrast(1.08) saturate(0.72) hue-rotate(-8deg)' }}
+                style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '18px', display: 'block', filter: 'contrast(1.08) saturate(0.72) hue-rotate(-8deg)' }}
               />
             </div>
           </div>
@@ -103,7 +103,7 @@ export default function Home() {
         <div style={{ backgroundColor: theme.cardBg, borderRadius: '28px', padding: '2.6rem', boxShadow: theme.boxShadow, border: `1px solid ${theme.border}`, minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease' }}>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Analyze Image File</h2>
+            <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Analyze Image/Video/Audio File</h2>
           </div>
 
           {/* Drop zone */}
@@ -112,7 +112,7 @@ export default function Home() {
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => !preview && fileInputRef.current.click()}
-            style={{ border: `2px dashed ${dragging ? theme.primary : '#cbd5e1'}`, borderRadius: '22px', padding: '2.8rem 2rem', textAlign: 'center', cursor: preview ? 'default' : 'pointer', backgroundColor: dragging ? `${theme.primary}08` : theme.cardBg, transition: 'all 0.2s', marginBottom: '1.2rem', minHeight: '360px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem', flex: 1 }}
+            style={{ border: `2px dashed ${dragging ? theme.primary : '#cbd5e1'}`, borderRadius: '22px', padding: '2.8rem 2rem', textAlign: 'center', cursor: preview ? 'default' : 'pointer', backgroundColor: dragging ? `${theme.primary}08` : theme.cardBg, transition: 'all 0.2s', marginBottom: '1.2rem', minHeight: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem', flex: 1 }}
           >
             {preview ? (
               <>
