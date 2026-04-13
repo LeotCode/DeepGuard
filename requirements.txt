@@ -1,10 +1,9 @@
 # Please ensure you have the following dependencies installed. You can install them using pip:
 # pip install -r requirements.txt
 # Any new dependencies should be added to the requirements.txt file.
---extra-index-url https://download.pytorch.org/whl/cu124
-torch==2.6.0+cu124
-torchvision==0.21.0+cu124
-torchaudio==2.6.0+cu124   
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0   
 Pillow
 opencv-python
 numpy<2.0
@@ -17,3 +16,5 @@ dotenv
 tqdm
 tensorflow>=2.16,<2.17
 certifi>=2023.0.0
+librosa
+soundfile

@@ -1,18 +1,14 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import os
-from main import DeepfakeImagePreprocessor, train_model
+from main import DeepfakeImagePreprocessor
 import argparse
+import torch.nn as nn
+from main import DeepfakeDetector
 
 
 class DeepfakeDataset(Dataset):
-    """Custom Dataset for image-based deepfake detection.
-
-    The preprocessor is intentionally NOT stored as a constructor argument.
-    DataLoader workers pickle the Dataset object before spawning, and
-    cv2.CascadeClassifier cannot be pickled. Instead, each worker creates its
-    own DeepfakeImagePreprocessor on first use via lazy initialisation.
-    """
+    """Custom Dataset for image-based deepfake detection."""
 
     def __init__(self, image_paths, labels):
         self.image_paths = image_paths
@@ -91,6 +87,53 @@ def split_dataset(image_paths, labels, train_ratio=0.8):
     val_labels = [labels[i] for i in val_indices]
 
     return train_paths, train_labels, val_paths, val_labels
+
+def train_model(train_data_loader, val_data_loader, num_epochs=10, learning_rate=0.0001, save_path="image_model.pth"):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = DeepfakeDetector().to(device)
+ 
+    criterion = nn.BCELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+ 
+    for epoch in range(num_epochs):
+        model.train()
+        train_loss = 0.0
+        for image_tensors, vision_features, labels in train_data_loader:
+            image_tensors = image_tensors.to(device)
+            vision_features = vision_features.to(device)
+            labels = labels.float().unsqueeze(1).to(device)
+ 
+            optimizer.zero_grad()
+            outputs = model(image_tensors, vision_features)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+ 
+        model.eval()
+        val_loss = 0.0
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for image_tensors, vision_features, labels in val_data_loader:
+                image_tensors = image_tensors.to(device)
+                vision_features = vision_features.to(device)
+                labels = labels.float().unsqueeze(1).to(device)
+ 
+                outputs = model(image_tensors, vision_features)
+                val_loss += criterion(outputs, labels).item()
+                predicted = (outputs > 0.5).float()
+                correct += (predicted == labels).sum().item()
+                total += labels.size(0)
+ 
+        print(f"Epoch [{epoch+1}/{num_epochs}] "
+              f"Train Loss: {train_loss/len(train_data_loader):.4f} | "
+              f"Val Loss: {val_loss/len(val_data_loader):.4f} | "
+              f"Val Accuracy: {100*correct/total:.2f}%")
+ 
+    torch.save(model.state_dict(), save_path)
+    print(f"Model saved to {save_path}")
+    return model
 
 
 if __name__ == "__main__":

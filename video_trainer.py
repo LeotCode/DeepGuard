@@ -9,13 +9,7 @@ from main import VideoDeepfakeDetector
 
 
 class VideoDataset(Dataset):
-    """Custom Dataset for video-based deepfake detection.
-
-    The preprocessor is intentionally NOT stored as a constructor argument.
-    DataLoader workers pickle the Dataset object before spawning, and
-    cv2.CascadeClassifier cannot be pickled. Instead, each worker creates its
-    own DeepfakeImagePreprocessor on first use via lazy initialisation.
-    """
+    """Custom Dataset for video-based deepfake detection."""
 
     def __init__(self, video_paths, labels, num_frames=10, target_size=(224, 224)):
         self.video_paths = video_paths

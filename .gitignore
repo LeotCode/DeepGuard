@@ -10,3 +10,7 @@ face_dataset/
 Dataset_Subfolder/
 test/
 firebase.js
+auth.js
+image_model.pth
+video_model.pth
+audio_model.pth

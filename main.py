@@ -9,6 +9,9 @@ import argparse
 from torchvision import models
 import os
 import mimetypes
+import librosa
+import librosa.feature
+import soundfile as sf
 
 class DeepfakeImagePreprocessor:
  
@@ -166,6 +169,218 @@ class DeepfakeImagePreprocessor:
             'feature_vector_seq': seq_feature_vectors,
             'num_frames_processed': len(frames),
         }
+    
+class AudioPreprocessor:
+    """Load audio clips, extract a mel spectrogram tensor and a fixed-length
+    handcrafted feature vector suitable for the AudioDeepfakeDetector."""
+
+    def __init__(
+        self,
+        sample_rate: int = 16_000,
+        duration: float = 4.0,
+        n_mels: int = 128,
+        n_fft: int = 1024,
+        hop_length: int = 512,
+        n_mfcc: int = 13,
+    ):
+        self.sample_rate = sample_rate
+        self.duration = duration
+        self.n_mels = n_mels
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.n_mfcc = n_mfcc
+        self.target_samples = int(sample_rate * duration)
+
+    def load_audio(self, audio_path: str) -> np.ndarray:
+        """Load an audio file and return a mono waveform at *self.sample_rate*."""
+ 
+        try:
+            waveform, sr = librosa.load(audio_path, sr=self.sample_rate, mono=True)
+        except Exception:
+            waveform, sr = sf.read(audio_path, always_2d=False)
+            if waveform.ndim > 1:
+                waveform = waveform.mean(axis=1)
+            if sr != self.sample_rate:
+                waveform = librosa.resample(waveform, orig_sr=sr, target_sr=self.sample_rate)
+        return waveform.astype(np.float32)
+    
+    def _fix_length(self, waveform: np.ndarray) -> np.ndarray:
+        """Ensure the waveform is exactly *self.target_samples* long."""
+
+        n = len(waveform)
+        if n >= self.target_samples:
+            return waveform[: self.target_samples]
+        # Pad with zeros (silence) on the right
+        return np.pad(waveform, (0, self.target_samples - n), mode='constant')
+    
+    def waveform_to_mel_tensor(self, waveform: np.ndarray) -> torch.Tensor:
+        """Convert a waveform to a normalised mel spectrogram tensor."""
+ 
+        waveform = self._fix_length(waveform)
+ 
+        mel_spec = librosa.feature.melspectrogram(
+            y=waveform,
+            sr=self.sample_rate,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            n_mels=self.n_mels,
+        )
+        # Convert to log scale (dB), then normalise to [0, 1]
+        log_mel = librosa.power_to_db(mel_spec, ref=np.max)
+        log_mel_norm = (log_mel - log_mel.min()) / (log_mel.max() - log_mel.min() + 1e-8)
+ 
+        tensor = torch.tensor(log_mel_norm, dtype=torch.float32)
+        tensor = tensor.unsqueeze(0).unsqueeze(0)  # (1, 1, n_mels, T)
+        return tensor
+    
+    def extract_audio_features(self, waveform: np.ndarray) -> dict:
+        """Extract 13 scalar features indicative of audio deepfakes."""
+ 
+        waveform = self._fix_length(waveform)
+        sr = self.sample_rate
+ 
+        # MFCCs — collapse time axis to a single mean value
+        mfccs = librosa.feature.mfcc(y=waveform, sr=sr, n_mfcc=self.n_mfcc)
+        mfcc_mean = float(np.mean(mfccs))
+ 
+        # Spectral features
+        spec_centroid = librosa.feature.spectral_centroid(y=waveform, sr=sr)
+        spectral_centroid_mean = float(np.mean(spec_centroid))
+ 
+        spec_bandwidth = librosa.feature.spectral_bandwidth(y=waveform, sr=sr)
+        spectral_bandwidth_mean = float(np.mean(spec_bandwidth))
+ 
+        spec_rolloff = librosa.feature.spectral_rolloff(y=waveform, sr=sr)
+        spectral_rolloff_mean = float(np.mean(spec_rolloff))
+ 
+        # Zero crossing rate
+        zcr = librosa.feature.zero_crossing_rate(waveform)
+        zero_crossing_rate_mean = float(np.mean(zcr))
+ 
+        # RMS energy
+        rms = librosa.feature.rms(y=waveform)
+        rms_energy_mean = float(np.mean(rms))
+ 
+        # Tempo (scalar)
+        tempo, _ = librosa.beat.beat_track(y=waveform, sr=sr)
+        tempo_val = float(tempo) if np.isscalar(tempo) else float(tempo[0])
+ 
+        # Fundamental frequency (pitch) via YIN
+        f0 = librosa.yin(waveform, fmin=60, fmax=400, sr=sr)
+        f0_voiced = f0[f0 > 0]
+        pitch_mean = float(np.mean(f0_voiced)) if len(f0_voiced) > 0 else 0.0
+        pitch_std  = float(np.std(f0_voiced))  if len(f0_voiced) > 0 else 0.0
+ 
+        # Harmonics-to-Noise Ratio (via harmonic/percussive separation)
+        harmonic, percussive = librosa.effects.hpss(waveform)
+        harmonic_rms   = float(np.sqrt(np.mean(harmonic ** 2)) + 1e-8)
+        percussive_rms = float(np.sqrt(np.mean(percussive ** 2)) + 1e-8)
+        harmonics_to_noise_ratio = float(10 * np.log10(harmonic_rms / percussive_rms))
+ 
+        # Spectral flatness
+        spec_flatness = librosa.feature.spectral_flatness(y=waveform)
+        spectral_flatness_mean = float(np.mean(spec_flatness))
+ 
+        # Chroma stability
+        chroma = librosa.feature.chroma_stft(y=waveform, sr=sr)
+        chroma_std_mean = float(np.mean(np.std(chroma, axis=1)))
+ 
+        # Dynamic range (peak-to-RMS difference in dB)
+        peak_db = float(20 * np.log10(np.max(np.abs(waveform)) + 1e-8))
+        rms_db  = float(20 * np.log10(rms_energy_mean + 1e-8))
+        dynamic_range = peak_db - rms_db
+ 
+        return {
+            'mfcc_mean':               mfcc_mean,
+            'spectral_centroid_mean':  spectral_centroid_mean,
+            'spectral_bandwidth_mean': spectral_bandwidth_mean,
+            'spectral_rolloff_mean':   spectral_rolloff_mean,
+            'zero_crossing_rate_mean': zero_crossing_rate_mean,
+            'rms_energy_mean':         rms_energy_mean,
+            'tempo':                   tempo_val,
+            'pitch_mean':              pitch_mean,
+            'pitch_std':               pitch_std,
+            'harmonics_to_noise_ratio': harmonics_to_noise_ratio,
+            'spectral_flatness_mean':  spectral_flatness_mean,
+            'chroma_std_mean':         chroma_std_mean,
+            'dynamic_range':           dynamic_range,
+        }
+    
+    def create_feature_vector(self, audio_features: dict) -> np.ndarray:
+        """Flatten the feature dict into a fixed-length float32 array."""
+
+        feature_list = [
+            audio_features['mfcc_mean'],
+            audio_features['spectral_centroid_mean'],
+            audio_features['spectral_bandwidth_mean'],
+            audio_features['spectral_rolloff_mean'],
+            audio_features['zero_crossing_rate_mean'],
+            audio_features['rms_energy_mean'],
+            audio_features['tempo'],
+            audio_features['pitch_mean'],
+            audio_features['pitch_std'],
+            audio_features['harmonics_to_noise_ratio'],
+            audio_features['spectral_flatness_mean'],
+            audio_features['chroma_std_mean'],
+            audio_features['dynamic_range'],
+        ]
+        return np.array(feature_list, dtype=np.float32)
+    
+    def process_audio(self, audio_path: str) -> dict:
+        """End-to-end preprocessing for a single audio file."""
+ 
+        waveform = self.load_audio(audio_path)
+        actual_duration = len(waveform) / self.sample_rate
+ 
+        mel_tensor = self.waveform_to_mel_tensor(waveform)
+        audio_features = self.extract_audio_features(waveform)
+        feature_vector = self.create_feature_vector(audio_features)
+ 
+        return {
+            'mel_tensor':     mel_tensor,
+            'audio_features': audio_features,
+            'feature_vector': feature_vector,
+            'duration_s':     actual_duration,
+            'sample_rate':    self.sample_rate,
+        }
+    
+class _MelCNNEncoder(nn.Module):
+    """Lightweight CNN that encodes a (1, n_mels, T) mel spectrogram into a
+    fixed-length embedding.  Uses the same depthwise-separable-style block
+    pattern as MobileNet so it stays fast on CPU.
+    """
+ 
+    def __init__(self, n_mels: int = 128, embed_dim: int = 256):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            # Block 1
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(2),          # (32, n_mels/2, T/2)
+ 
+            # Block 2
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2),          # (64, n_mels/4, T/4)
+ 
+            # Block 3
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2),          # (128, n_mels/8, T/8)
+ 
+            # Global average pool → (128,)
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+ 
+            nn.Linear(128, embed_dim),
+            nn.ReLU(),
+        )
+ 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.encoder(x)
 
 class DeepfakeDetector(nn.Module):
  
@@ -174,7 +389,7 @@ class DeepfakeDetector(nn.Module):
     def __init__(self, num_vision_features=5, dropout_rate=0.3):
         super(DeepfakeDetector, self).__init__()
  
-        self.efficientnet = models.efficientnet_b0(pretrained=True)
+        self.efficientnet = models.efficientnet_b5(pretrained=True)
         num_efficientnet_features = self.efficientnet.classifier[1].in_features
         self.efficientnet.classifier = nn.Identity()
  
@@ -233,6 +448,53 @@ class VideoDeepfakeDetector(nn.Module):
         last_hidden = hn[-1]                # (batch, hidden)
         out = self.classifier(last_hidden)
         return out
+    
+class AudioDeepfakeDetector(nn.Module):
+    """Binary classifier that fuses a CNN-encoded mel spectrogram with a
+    handcrafted audio feature vector.
+ 
+    Parameters
+    ----------
+    n_mels : int
+        Mel bands — must match AudioPreprocessor.n_mels.
+    num_audio_features : int
+        Length of the handcrafted feature vector (default 13).
+    cnn_embed_dim : int
+        Output dimensionality of the CNN encoder.
+    dropout_rate : float
+        Dropout probability in the fusion MLP.
+    """
+ 
+    def __init__(
+        self,
+        n_mels: int = 128,
+        num_audio_features: int = 13,
+        cnn_embed_dim: int = 256,
+        dropout_rate: float = 0.3,
+    ):
+        super().__init__()
+ 
+        self.cnn_encoder = _MelCNNEncoder(n_mels=n_mels, embed_dim=cnn_embed_dim)
+ 
+        self.fusion_layer = nn.Sequential(
+            nn.Linear(cnn_embed_dim + num_audio_features, 256),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(128, 1),
+            nn.Sigmoid(),
+        )
+ 
+    def forward(
+        self,
+        mel_tensor: torch.Tensor,        # (batch, 1, n_mels, T)
+        audio_feature_vector: torch.Tensor,  # (batch, num_audio_features)
+    ) -> torch.Tensor:
+        cnn_features = self.cnn_encoder(mel_tensor)               # (batch, embed_dim)
+        combined = torch.cat([cnn_features, audio_feature_vector], dim=1)
+        return self.fusion_layer(combined) 
 
 class DeepfakeDetectionPipeline:
  
@@ -318,66 +580,97 @@ class VideoDeepfakeDetectionPipeline:
             'threshold': threshold,
             'frames_analyzed': processed['num_frames_processed'],
         }
+    
+class AudioDeepfakeDetectionPipeline:
+    """End-to-end pipeline for audio deepfake inference.
  
+    Usage
+    -----
+    >>> pipeline = AudioDeepfakeDetectionPipeline(model_path="audio_model.pth")
+    >>> result   = pipeline.predict("suspect_clip.wav")
+    >>> print(result['classification'], result['confidence_score'])
+    """
  
-def train_model(train_data_loader, val_data_loader, num_epochs=10, learning_rate=0.0001, save_path="image_model.pth"):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = DeepfakeDetector().to(device)
+    def __init__(self, model_path: str | None = None, device=None):
+        self.preprocessor = AudioPreprocessor()
  
-    criterion = nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if device is None:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = device
  
-    for epoch in range(num_epochs):
-        model.train()
-        train_loss = 0.0
-        for image_tensors, vision_features, labels in train_data_loader:
-            image_tensors = image_tensors.to(device)
-            vision_features = vision_features.to(device)
-            labels = labels.float().unsqueeze(1).to(device)
+        self.model = AudioDeepfakeDetector()
  
-            optimizer.zero_grad()
-            outputs = model(image_tensors, vision_features)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
+        if model_path:
+            self.model.load_state_dict(
+                torch.load(model_path, map_location=self.device)
+            )
+            print(f"Loaded audio model weights from {model_path}")
+        else:
+            print("Warning: No audio model weights provided. Using randomly initialised weights.")
+            print("For production use, train the model on an audio deepfake dataset first.")
  
-        model.eval()
-        val_loss = 0.0
-        correct = 0
-        total = 0
+        self.model.to(self.device)
+        self.model.eval()
+ 
+    def predict(self, audio_path: str, threshold: float = 0.5) -> dict:
+        """Run inference on a single audio file.
+ 
+        Parameters
+        ----------
+        audio_path : str
+            Path to any audio format supported by librosa / soundfile.
+        threshold : float
+            Confidence score above which the clip is classified as a deepfake.
+ 
+        Returns
+        -------
+        dict with keys:
+            confidence_score  – float in [0, 1]
+            is_deepfake       – bool
+            classification    – 'DEEPFAKE' or 'REAL'
+            threshold         – value used for classification
+            duration_s        – original clip length in seconds
+            sample_rate       – sample rate used during preprocessing
+            audio_features    – raw handcrafted feature dict
+        """
+        preprocessed = self.preprocessor.process_audio(audio_path)
+ 
+        mel_tensor = preprocessed['mel_tensor'].to(self.device)
+        feature_vector = (
+            torch.tensor(preprocessed['feature_vector'])
+            .unsqueeze(0)
+            .to(self.device)
+        )
+ 
         with torch.no_grad():
-            for image_tensors, vision_features, labels in val_data_loader:
-                image_tensors = image_tensors.to(device)
-                vision_features = vision_features.to(device)
-                labels = labels.float().unsqueeze(1).to(device)
+            confidence = self.model(mel_tensor, feature_vector)
+            confidence_score = confidence.item()
  
-                outputs = model(image_tensors, vision_features)
-                val_loss += criterion(outputs, labels).item()
-                predicted = (outputs > 0.5).float()
-                correct += (predicted == labels).sum().item()
-                total += labels.size(0)
+        is_deepfake = confidence_score > threshold
  
-        print(f"Epoch [{epoch+1}/{num_epochs}] "
-              f"Train Loss: {train_loss/len(train_data_loader):.4f} | "
-              f"Val Loss: {val_loss/len(val_data_loader):.4f} | "
-              f"Val Accuracy: {100*correct/total:.2f}%")
- 
-    torch.save(model.state_dict(), save_path)
-    print(f"Model saved to {save_path}")
-    return model
+        return {
+            'confidence_score': confidence_score,
+            'is_deepfake':      is_deepfake,
+            'classification':   'DEEPFAKE' if is_deepfake else 'REAL',
+            'threshold':        threshold,
+            'duration_s':       preprocessed['duration_s'],
+            'sample_rate':      preprocessed['sample_rate'],
+            'audio_features':   preprocessed['audio_features'],
+        }
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Deepfake detection using local OpenCV preprocessing")
-    parser.add_argument("file_path", type=str, help="Path to the input file (image or video)")
+    parser = argparse.ArgumentParser(description="Deepfake detection using local OpenCV / librosa preprocessing")
+    parser.add_argument("file_path", type=str, help="Path to the input file (image, video, or audio)")
     parser.add_argument("--model", type=str, default=None, help="Path to trained model weights")
     parser.add_argument("--threshold", type=float, default=0.5, help="Classification threshold (0-1)")
-    parser.add_argument("--frames", type=int, default=10, help="Number of frames to sample if input is a video")
+    parser.add_argument("--frames", type=int, default=10, help="Frames to sample if input is a video")
     args = parser.parse_args()
  
     mime_type, _ = mimetypes.guess_type(args.file_path)
     is_video = mime_type and mime_type.startswith('video')
+    is_audio = mime_type and mime_type.startswith('audio')
  
     try:
         if is_video:
@@ -385,6 +678,11 @@ if __name__ == "__main__":
             pipeline = VideoDeepfakeDetectionPipeline(model_path=args.model)
             result = pipeline.predict(args.file_path, threshold=args.threshold, num_frames=args.frames)
             print_type = "Video"
+        elif is_audio:
+            print("\n🔊 Audio file detected. Initialising Audio Pipeline...")
+            pipeline   = AudioDeepfakeDetectionPipeline(model_path=args.model)
+            result     = pipeline.predict(args.file_path, threshold=args.threshold)
+            print_type = "Audio"
         else:
             print("\n🖼️ Image file detected. Initialising Image Pipeline...")
             pipeline = DeepfakeDetectionPipeline(model_path=args.model)
@@ -397,11 +695,15 @@ if __name__ == "__main__":
         print(f"File: {args.file_path} ({print_type})")
         print(f"Classification: {result['classification']}")
         print(f"Confidence Score: {result['confidence_score']:.4f}")
-        if not is_video:
-            print(f"Faces Detected: {result['num_faces_detected']}")
-            print(f"Original Size: {result['original_size']}")
+        
+        if is_video:
+            print(f"Frames Analysed:  {result['frames_analyzed']}")
+        elif is_audio:
+            print(f"Duration:         {result['duration_s']:.2f}s")
+            print(f"Sample Rate:      {result['sample_rate']} Hz")
         else:
-            print(f"Frames Analysed: {result['frames_analyzed']}")
+            print(f"Faces Detected:   {result['num_faces_detected']}")
+            print(f"Original Size:    {result['original_size']}")
         print("=" * 50)
  
         if result['is_deepfake']:
