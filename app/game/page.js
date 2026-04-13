@@ -9,8 +9,9 @@ export default function GamePage() {
     <div style={{
       background: theme.bg,
       color: theme.text,
-      minHeight: '100vh',
-      padding: '5rem 2rem 3rem',
+      height: 'calc(100vh - 72px)',
+      padding: '1.5rem 0.5rem 1rem',
+      overflow: 'hidden',
       transition: 'background-color 0.3s ease, color 0.3s ease'
     }}>
       <DeepfakeGame />

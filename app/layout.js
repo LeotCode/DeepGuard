@@ -3,9 +3,11 @@ import Navbar from '@/components/Navbar'
 import ScrollingBar from '@/components/ScrollingBar'
 import { ResultsProvider } from '@/context/ResultsContext'
 import { ThemeProvider, useTheme } from '@/context/ThemeContext'
+import { usePathname } from 'next/navigation'
 
 function AppContent({ children }) {
   const { theme } = useTheme()
+  const pathname = usePathname()
 
   return (
     <body style={{
@@ -23,7 +25,7 @@ function AppContent({ children }) {
         <main style={{ paddingTop: '72px', flex: 1 }}>
           {children}
         </main>
-        <ScrollingBar />
+        {pathname !== '/game' && !pathname.startsWith('/results') && pathname !== '/settings' && pathname !== '/auth' && <ScrollingBar />}
       </ResultsProvider>
     </body>
   )

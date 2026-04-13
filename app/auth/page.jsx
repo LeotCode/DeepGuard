@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/context/ThemeContext'
 import { loginWithGoogle, loginWithFacebook, loginWithEmail, registerWithEmail, sendPasswordReset } from '../../auth.js'
-import { updateProfile } from 'firebase/auth'
 
 const FONT = "'Jost', sans-serif"
 
@@ -14,18 +13,17 @@ export default function Auth() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
 
   const inputStyle = (name) => ({
     width: '100%',
-    padding: '0.85rem 1rem',
+    padding: '0.7rem 0.8rem',
     backgroundColor: theme.cardBg,
     border: `1.5px solid ${focused === name ? theme.primary : theme.border}`,
     borderRadius: '10px',
     color: theme.text,
-    fontSize: '0.95rem',
+    fontSize: '0.9rem',
     outline: 'none',
     boxSizing: 'border-box',
     fontFamily: FONT,
@@ -42,7 +40,6 @@ export default function Auth() {
         router.push('/')
       } else if (mode === 'signup') {
         const userCredential = await registerWithEmail(email, password)
-        await updateProfile(userCredential.user, { displayName: username })
         router.push('/')
       } else if (mode === 'forgot') {
         await sendPasswordReset(email)
@@ -96,21 +93,21 @@ export default function Auth() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: theme.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: FONT, transition: 'background-color 0.3s ease, color 0.3s ease' }}>
-      <div style={{ width: '100%', maxWidth: '440px' }}>
+    <div style={{ height: 'calc(100vh - 72px)', backgroundColor: theme.bg, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '3rem', fontFamily: FONT, overflow: 'hidden', transition: 'background-color 0.3s ease, color 0.3s ease' }}>
+      <div style={{ width: '100%', maxWidth: '380px' }}>
 
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <span style={{ fontFamily: FONT, fontSize: '1.8rem', fontWeight: '900', color: theme.primary }}>
+        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+          <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: '900', color: theme.primary }}>
             Deep<span style={{ color: theme.primary }}>Guard</span>
           </span>
         </div>
 
         {/* Card */}
-        <div style={{ backgroundColor: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '20px', padding: '2.5rem', boxShadow: theme.boxShadow }}>
+        <div style={{ backgroundColor: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '20px', padding: '1rem', boxShadow: theme.boxShadow }}>
 
           {/* Header */}
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '900', color: theme.text, textAlign: 'center', margin: '0 0 0.4rem', fontFamily: FONT }}>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: '900', color: theme.text, textAlign: 'center', margin: '0 0 0.4rem', fontFamily: FONT }}>
             {mode === 'login' ? 'Welcome Back' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
           </h1>
           {mode === 'forgot' && (
@@ -118,13 +115,13 @@ export default function Auth() {
               <span style={{ fontSize: '0.9rem', color: theme.primary, cursor: 'pointer', fontWeight: '600', fontFamily: FONT }} onClick={() => setMode('login')}>← Back to Sign In</span>
             </div>
           )}
-          <p style={{ color: theme.muted, textAlign: 'center', fontSize: '0.9rem', marginBottom: '2rem', fontFamily: FONT }}>
+          <p style={{ color: theme.muted, textAlign: 'center', fontSize: '0.85rem', marginBottom: '1rem', fontFamily: FONT }}>
             {mode === 'login' ? 'Sign in to your DeepGuard account' : mode === 'signup' ? 'Join DeepGuard today' : 'Enter your email to reset your password'}
           </p>
 
           {/* Tab switcher */}
           {mode !== 'forgot' && (
-            <div style={{ display: 'flex', backgroundColor: theme.bg, borderRadius: '10px', padding: '4px', marginBottom: '1.75rem', border: `1px solid ${theme.border}` }}>
+            <div style={{ display: 'flex', backgroundColor: theme.bg, borderRadius: '10px', padding: '4px', marginBottom: '1rem', border: `1px solid ${theme.border}` }}>
               {getTabLabels().map((label, i) => {
                 const active = i === getActiveIndex()
                 return (
@@ -157,14 +154,7 @@ export default function Auth() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-            {mode === 'signup' && (
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: theme.text, marginBottom: '0.4rem', fontFamily: FONT }}>Username</label>
-                <input type="text" placeholder="Your username" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle('username')} onFocus={() => setFocused('username')} onBlur={() => setFocused('')} />
-              </div>
-            )}
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
 
             {(mode === 'login' || mode === 'signup' || mode === 'forgot') && (
               <div>
@@ -199,7 +189,7 @@ export default function Auth() {
 
             <button
               type="submit"
-              style={{ width: '100%', padding: '0.95rem', backgroundColor: theme.primary, color: '#fff', border: 'none', borderRadius: '10px', fontSize: '1rem', fontWeight: '800', cursor: 'pointer', fontFamily: FONT, marginTop: '0.5rem', transition: 'background 0.2s' }}
+              style={{ width: '100%', padding: '0.8rem', backgroundColor: theme.primary, color: '#fff', border: 'none', borderRadius: '10px', fontSize: '0.95rem', fontWeight: '800', cursor: 'pointer', fontFamily: FONT, marginTop: '0.5rem', transition: 'background 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = theme.primary}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = theme.primary}
             >
@@ -207,7 +197,7 @@ export default function Auth() {
             </button>
 
             {(mode === 'login' || mode === 'signup') && (
-              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                 <button
                   type="button"
                   onClick={() => handleOAuth(loginWithGoogle)}

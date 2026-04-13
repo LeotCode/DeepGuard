@@ -62,25 +62,25 @@ export default function Home() {
     <div style={{ background: theme.bg, minHeight: '100vh', fontFamily: FONT, transition: 'background-color 0.3s ease' }}>
 
       {/* Hero */}
-      <div style={{ maxWidth: '1480px', margin: '0 auto', padding: '2rem 2.25rem 2rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1.22fr) minmax(560px, 1.05fr)', gap: '2.5rem', alignItems: 'stretch' }}>
+      <div style={{ maxWidth: '1480px', margin: '0 auto', padding: '1.5rem 1.5rem 1rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1.22fr) minmax(500px, 1.05fr)', gap: '1.5rem', alignItems: 'stretch' }}>
 
         {/* LEFT */}
-        <div style={{ backgroundColor: theme.cardBg, borderRadius: '28px', border: `1px solid ${theme.border}`, boxShadow: theme.boxShadow, padding: '2.5rem', minHeight: '100%', display: 'flex', flexDirection: 'column', transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease' }}>
+        <div style={{ backgroundColor: theme.cardBg, borderRadius: '28px', border: `1px solid ${theme.border}`, boxShadow: theme.boxShadow, padding: '1.5rem', minHeight: '100%', display: 'flex', flexDirection: 'column', transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease' }}>
           <h1 style={{ margin: '0 0 1.25rem', fontSize: '2.45rem', fontWeight: '900', color: theme.text, lineHeight: 1.1, fontFamily: FONT, transition: 'color 0.3s ease' }}>
             What Makes Deepfakes Convincing?
           </h1>
 
-          <p style={{ color: theme.muted, fontSize: '1.18rem', lineHeight: 1.8, margin: '0 0 1.25rem', maxWidth: '620px', fontFamily: FONT, transition: 'color 0.3s ease' }}>
+          <p style={{ color: theme.muted, fontSize: '1.18rem', lineHeight: 1.8, margin: '0 0 0.75rem', maxWidth: '620px', fontFamily: FONT, transition: 'color 0.3s ease' }}>
             Deepfakes are edited or AI-generated content designed to imitate real people. They often look believable because modern tools can mimic skin texture, lighting, and facial structure in seconds.
           </p>
 
-          <p style={{ color: theme.muted, fontSize: '1.18rem', lineHeight: 1.8, margin: '0 0 1.85rem', maxWidth: '620px', fontFamily: FONT, transition: 'color 0.3s ease' }}>
+          <p style={{ color: theme.muted, fontSize: '1.18rem', lineHeight: 1.8, margin: '0 0 1rem', maxWidth: '620px', fontFamily: FONT, transition: 'color 0.3s ease' }}>
             The hardest part is that small errors can be easy to miss. Look closely at edges, shadows, facial symmetry, background consistency, and skin detail. Comparing an authentic image next to an edited version helps train the eye.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginTop: 'auto' }}>
-            <div style={{ borderRadius: '24px', overflow: 'hidden', background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '1.2rem', transition: 'border-color 0.3s ease' }}>
-              <p style={{ margin: '0 0 0.9rem', fontSize: '1.05rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Real Image</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: 'auto' }}>
+            <div style={{ borderRadius: '24px', overflow: 'hidden', background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '0.8rem', transition: 'border-color 0.3s ease' }}>
+              <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Real Image</p>
               <img
                 src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80"
                 alt="Real portrait example"
@@ -88,8 +88,8 @@ export default function Home() {
               />
             </div>
 
-            <div style={{ borderRadius: '24px', overflow: 'hidden', background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '1.2rem', transition: 'border-color 0.3s ease' }}>
-              <p style={{ margin: '0 0 0.9rem', fontSize: '1.05rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Edited Version</p>
+            <div style={{ borderRadius: '24px', overflow: 'hidden', background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '0.8rem', transition: 'border-color 0.3s ease' }}>
+              <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Edited Version</p>
               <img
                 src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80&sat=-100&contrast=130&blur=20"
                 alt="Edited portrait example"
@@ -100,10 +100,10 @@ export default function Home() {
         </div>
 
         {/* RIGHT: upload card */}
-        <div style={{ backgroundColor: theme.cardBg, borderRadius: '28px', padding: '2.6rem', boxShadow: theme.boxShadow, border: `1px solid ${theme.border}`, minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease' }}>
+        <div style={{ backgroundColor: theme.cardBg, borderRadius: '28px', padding: '1.5rem', boxShadow: theme.boxShadow, border: `1px solid ${theme.border}`, minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease' }}>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Analyze Image/Video/Audio File</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Analyze Image/Video/Audio File</h2>
           </div>
 
           {/* Drop zone */}
@@ -112,7 +112,7 @@ export default function Home() {
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => !preview && fileInputRef.current.click()}
-            style={{ border: `2px dashed ${dragging ? theme.primary : '#cbd5e1'}`, borderRadius: '22px', padding: '2.8rem 2rem', textAlign: 'center', cursor: preview ? 'default' : 'pointer', backgroundColor: dragging ? `${theme.primary}08` : theme.cardBg, transition: 'all 0.2s', marginBottom: '1.2rem', minHeight: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem', flex: 1 }}
+            style={{ border: `2px dashed ${dragging ? theme.primary : '#cbd5e1'}`, borderRadius: '22px', padding: '1.5rem 1.2rem', textAlign: 'center', cursor: preview ? 'default' : 'pointer', backgroundColor: dragging ? `${theme.primary}08` : theme.cardBg, transition: 'all 0.2s', marginBottom: '0.8rem', minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.8rem', flex: 1 }}
           >
             {preview ? (
               <>
@@ -121,12 +121,12 @@ export default function Home() {
               </>
             ) : (
               <>
-                <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
                   <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
                 </svg>
-                <p style={{ margin: 0, fontWeight: '600', fontSize: '1.14rem', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Drop image file here or click to browse</p>
-                <button onClick={(e) => { e.stopPropagation(); fileInputRef.current.click() }} style={{ marginTop: '0.35rem', padding: '0.75rem 1.9rem', background: DEEP_GRADIENT, color: '#fff', border: 'none', borderRadius: '10px', fontSize: '1.02rem', fontWeight: '700', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 10px 22px rgba(15, 37, 87, 0.16)' }}>
+                <p style={{ margin: 0, fontWeight: '600', fontSize: '0.95rem', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Drop image file here or click to browse</p>
+                <button onClick={(e) => { e.stopPropagation(); fileInputRef.current.click() }} style={{ marginTop: '0.25rem', padding: '0.6rem 1.5rem', background: DEEP_GRADIENT, color: '#fff', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 10px 22px rgba(15, 37, 87, 0.16)' }}>
                   Browse Files
                 </button>
               </>
@@ -134,26 +134,26 @@ export default function Home() {
           </div>
 
           {/* Supported formats */}
-          <p style={{ margin: '0 0 1.35rem', color: theme.muted, fontSize: '0.88rem', textAlign: 'center', fontFamily: FONT }}>
+          <p style={{ margin: '0 0 0.8rem', color: theme.muted, fontSize: '0.75rem', textAlign: 'center', fontFamily: FONT }}>
             Supports: JPEG, PNG · MP4, MOV, AVI, MKV · MP3, WAV, AAC
           </p>
 
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,audio/mpeg,audio/wav,audio/aac" style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files[0])} />
 
-          <button onClick={handleScan} disabled={!selectedFile || loading} style={{ width: '100%', padding: '1.15rem', background: selectedFile && !loading ? DEEP_GRADIENT : theme.border, color: selectedFile && !loading ? '#fff' : theme.muted, border: 'none', borderRadius: '14px', fontSize: '1.14rem', fontWeight: '800', cursor: selectedFile && !loading ? 'pointer' : 'not-allowed', fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'background 0.2s', boxShadow: selectedFile && !loading ? '0 14px 28px rgba(15, 37, 87, 0.2)' : 'none' }} onMouseEnter={e => { if (selectedFile && !loading) e.currentTarget.style.background = DEEP_GRADIENT_HOVER }} onMouseLeave={e => { if (selectedFile && !loading) e.currentTarget.style.background = DEEP_GRADIENT }}>
+          <button onClick={handleScan} disabled={!selectedFile || loading} style={{ width: '100%', padding: '0.9rem', background: selectedFile && !loading ? DEEP_GRADIENT : theme.border, color: selectedFile && !loading ? '#fff' : theme.muted, border: 'none', borderRadius: '14px', fontSize: '1rem', fontWeight: '800', cursor: selectedFile && !loading ? 'pointer' : 'not-allowed', fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'background 0.2s', boxShadow: selectedFile && !loading ? '0 14px 28px rgba(15, 37, 87, 0.2)' : 'none' }} onMouseEnter={e => { if (selectedFile && !loading) e.currentTarget.style.background = DEEP_GRADIENT_HOVER }} onMouseLeave={e => { if (selectedFile && !loading) e.currentTarget.style.background = DEEP_GRADIENT }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
             {loading ? 'Scanning...' : 'Start Detection'}
           </button>
         </div>
       </div>
 
-      <div style={{ maxWidth: '1480px', margin: '0 auto', padding: '0 2.25rem 3rem', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ maxWidth: '1480px', margin: '0 auto', padding: '0 1.5rem 2rem', display: 'flex', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ margin: '0 0 1rem', color: theme.text, fontSize: '1.28rem', fontWeight: '700', fontFamily: FONT }}>
+          <p style={{ margin: '0 0 0.8rem', color: theme.text, fontSize: '1.1rem', fontWeight: '700', fontFamily: FONT }}>
             You think you can detect a deepfake? Try it out
           </p>
           <Link href="/game" style={{ textDecoration: 'none' }}>
-            <button style={{ background: DEEP_GRADIENT, color: '#fff', border: 'none', borderRadius: '12px', padding: '1rem 1.7rem', fontSize: '1.08rem', fontWeight: '700', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 14px 28px rgba(15, 37, 87, 0.16)' }}>
+            <button style={{ background: DEEP_GRADIENT, color: '#fff', border: 'none', borderRadius: '12px', padding: '0.8rem 1.4rem', fontSize: '0.95rem', fontWeight: '700', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 14px 28px rgba(15, 37, 87, 0.16)' }}>
               Play The Game
             </button>
           </Link>
@@ -161,7 +161,7 @@ export default function Home() {
       </div>
 
       {loading && (
-        <div id="scan-loading" style={{ maxWidth: '760px', margin: '0 auto', padding: '0 2rem 3rem' }}>
+        <div id="scan-loading" style={{ maxWidth: '760px', margin: '0 auto', padding: '0 1rem 2rem' }}>
           <ScanLoading scanDone={scanDone} onComplete={handleScanComplete} />
         </div>
       )}
