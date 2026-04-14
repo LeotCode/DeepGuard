@@ -3,8 +3,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/context/ThemeContext'
 import { useState, useEffect } from 'react'
-import { auth } from '../firebase'
-import { logout } from '../auth'
+import { auth } from '../lib/firebase'
+import { logout } from '../lib/auth'
 import { onAuthStateChanged } from 'firebase/auth'
 
 export default function Navbar() {

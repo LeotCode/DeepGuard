@@ -6,20 +6,12 @@ import { useResults } from '@/context/ResultsContext'
 import { useTheme } from '@/context/ThemeContext'
 import ScanLoading from '@/components/ScanLoading'
 import BlogCarousel from '@/components/BlogCarousel'
+import { auth } from '@/lib/firebase'
 
 const DEEP_GRADIENT = 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)'
 const DEEP_GRADIENT_HOVER = 'linear-gradient(135deg, #163d86 0%, #2454b8 100%)'
-const FONT   = "'Jost', sans-serif"
-
-const MOCK_RESULT = {
-  total_faces: 1,
-  predictions: [{ face: 1, label: 'fake', confidence: 78.4 }],
-  ai_score: 78, confidence: 85, file_type: 'image',
-  red_flags: ['Unusual facial texture', 'Inconsistent lighting on face and background', 'Slight blurring around the edges of facial features'],
-  analysis_summary: 'The image exhibits some characteristics typical of manipulated content, such as minor texture inconsistencies and lighting mismatches. However, these do not strongly indicate AI generation, suggesting it may be an authentic photograph with slight imperfections.',
-  temporal_data: Array.from({ length: 22 }, (_, i) => ({ timestamp: i * 5, ai_likelihood: 13 + Math.sin(i * 0.7) * 7 + Math.random() * 5 })),
-  heatmap_regions: [{ x: 48, y: 38, width: 18, height: 22, intensity: 0.3 }, { x: 30, y: 58, width: 14, height: 16, intensity: 0.25 }],
-}
+const FONT = "'Jost', sans-serif"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function Home() {
   const { theme } = useTheme()
@@ -29,6 +21,7 @@ export default function Home() {
   const [preview, setPreview]           = useState(null)
   const [dragging, setDragging]         = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [error, setError]               = useState(null)
   const fileInputRef = useRef(null)
   const { addResult } = useResults()
   const router = useRouter()
@@ -37,23 +30,66 @@ export default function Home() {
     if (!file) return
     setSelectedFile(file)
     setPreview(URL.createObjectURL(file))
+    setError(null)
   }
 
   const handleDrop = (e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }
 
   const handleScan = async () => {
     if (!selectedFile) return
-    setLoading(true); setScanDone(false)
+    setLoading(true); setScanDone(false); setError(null)
     setTimeout(() => {
       document.getElementById('scan-loading')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 100)
     try {
-      const id = Date.now(); setPendingId(id)
-      await new Promise((r) => setTimeout(r, 4200))
-      const data = { ...MOCK_RESULT, file_name: selectedFile.name, file_url: preview }
-      addResult({ id, filename: selectedFile.name, preview, predictions: data.predictions, total_faces: data.total_faces, ai_score: data.ai_score, confidence: data.confidence, red_flags: data.red_flags, analysis_summary: data.analysis_summary, temporal_data: data.temporal_data, heatmap_regions: data.heatmap_regions, file_url: preview, file_type: 'image', date: new Date().toLocaleDateString() })
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken() : null
+
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+
+      const res = await fetch(`${API_BASE}/scan`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+        throw new Error(err.detail || `Server error ${res.status}`)
+      }
+
+      const data = await res.json()
+      const id = data.scan_id || Date.now()
+      setPendingId(id)
+
+      addResult({
+        id,
+        scan_id: data.scan_id,
+        filename: selectedFile.name,
+        preview,
+        predictions: data.predictions || [],
+        total_faces: data.total_faces ?? 0,
+        ai_score: data.ai_score,
+        confidence: data.confidence,
+        red_flags: data.red_flags || [],
+        analysis_summary: data.analysis_summary || '',
+        temporal_data: data.temporal_data || [],
+        heatmap_regions: data.heatmap_regions || [],
+        model_scores: data.model_scores || [],
+        file_url: preview,
+        file_type: data.file_type || 'image',
+        is_deepfake: data.is_deepfake,
+        frames_analyzed: data.frames_analyzed,
+        date: new Date().toLocaleDateString(),
+      })
+
       setScanDone(true)
-    } catch { setLoading(false); setScanDone(false); alert('Scan failed.') }
+    } catch (err) {
+      setLoading(false)
+      setScanDone(false)
+      setError(err.message || 'Scan failed. Please try again.')
+    }
   }
 
   const handleScanComplete = () => { if (pendingId) router.push(`/results/${pendingId}`) }
@@ -117,7 +153,7 @@ export default function Home() {
             {preview ? (
               <>
                 <img src={preview} alt="Preview" style={{ maxHeight: '250px', maxWidth: '100%', borderRadius: '12px', objectFit: 'contain' }} />
-                <button onClick={(e) => { e.stopPropagation(); setPreview(null); setSelectedFile(null) }} style={{ fontSize: '0.9rem', color: theme.muted, background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: '8px', padding: '0.45rem 0.95rem', cursor: 'pointer', fontFamily: FONT, transition: 'color 0.3s ease, border-color 0.3s ease' }}>Remove</button>
+                <button onClick={(e) => { e.stopPropagation(); setPreview(null); setSelectedFile(null); setError(null) }} style={{ fontSize: '0.9rem', color: theme.muted, background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: '8px', padding: '0.45rem 0.95rem', cursor: 'pointer', fontFamily: FONT, transition: 'color 0.3s ease, border-color 0.3s ease' }}>Remove</button>
               </>
             ) : (
               <>
@@ -132,6 +168,12 @@ export default function Home() {
               </>
             )}
           </div>
+
+          {error && (
+            <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626', fontSize: '0.85rem', fontFamily: FONT }}>
+              ⚠ {error}
+            </div>
+          )}
 
           {/* Supported formats */}
           <p style={{ margin: '0 0 0.8rem', color: theme.muted, fontSize: '0.75rem', textAlign: 'center', fontFamily: FONT }}>

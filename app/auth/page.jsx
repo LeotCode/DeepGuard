@@ -2,7 +2,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/context/ThemeContext'
+<<<<<<< HEAD
 import { loginWithGoogle, loginWithFacebook, loginWithEmail, registerWithEmail, sendPasswordReset } from '../../auth.js'
+=======
+import { loginWithGoogle, loginWithFacebook, loginWithEmail, registerWithEmail, sendPasswordReset } from '../../lib/auth.js'
+import { updateProfile } from 'firebase/auth'
+>>>>>>> 1b938e4 (WIP: frontend updates (removed sensitive files))
 
 const FONT = "'Jost', sans-serif"
 

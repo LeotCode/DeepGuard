@@ -2,34 +2,15 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useResults } from '@/context/ResultsContext'
+import { auth } from '@/lib/firebase'
 
-const MOCK_RESULT = {
-  total_faces: 1,
-  predictions: [{ face: 1, label: 'fake', confidence: 78.4 }],
-  ai_score: 78,
-  confidence: 85,
-  file_type: 'image',
-  red_flags: [
-    'Unusual facial texture',
-    'Inconsistent lighting on face and background',
-    'Slight blurring around the edges of facial features',
-  ],
-  analysis_summary:
-    'The image exhibits some characteristics typical of manipulated content, such as minor texture inconsistencies and lighting mismatches. However, these do not strongly indicate AI generation, suggesting it may be an authentic photograph with slight imperfections.',
-  temporal_data: Array.from({ length: 22 }, (_, i) => ({
-    timestamp: i * 5,
-    ai_likelihood: 13 + Math.sin(i * 0.7) * 7 + Math.random() * 5,
-  })),
-  heatmap_regions: [
-    { x: 48, y: 38, width: 18, height: 22, intensity: 0.3 },
-    { x: 30, y: 58, width: 14, height: 16, intensity: 0.25 },
-  ],
-}
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function ImageUpload({ loading, setLoading, scanDone, setScanDone, pendingId, setPendingId }) {
   const [preview, setPreview] = useState(null)
   const [dragging, setDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [error, setError] = useState(null)
   const fileInputRef = useRef(null)
   const { addResult } = useResults()
   const router = useRouter()
@@ -38,6 +19,7 @@ export default function ImageUpload({ loading, setLoading, scanDone, setScanDone
     if (!file) return
     setSelectedFile(file)
     setPreview(URL.createObjectURL(file))
+    setError(null)
   }
 
   const handleDrop = (e) => {
@@ -50,39 +32,57 @@ export default function ImageUpload({ loading, setLoading, scanDone, setScanDone
     if (!selectedFile) return
     setLoading(true)
     setScanDone(false)
+    setError(null)
 
     try {
       const id = Date.now()
       setPendingId(id)
 
-      // MOCK delay — replace with real axios call when backend is live
-      await new Promise((r) => setTimeout(r, 4200))
+      // Get Firebase auth token
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken() : null
 
-      const data = { ...MOCK_RESULT, file_name: selectedFile.name, file_url: preview }
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+
+      const res = await fetch(`${API_BASE}/scan`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+        throw new Error(err.detail || `Server error ${res.status}`)
+      }
+
+      const data = await res.json()
 
       addResult({
-        id,
+        id: data.scan_id || id,
         filename: selectedFile.name,
         preview,
-        predictions: data.predictions,
-        total_faces: data.total_faces,
+        predictions: data.predictions || [],
+        total_faces: data.total_faces ?? 0,
         ai_score: data.ai_score,
         confidence: data.confidence,
-        red_flags: data.red_flags,
-        analysis_summary: data.analysis_summary,
-        temporal_data: data.temporal_data,
-        heatmap_regions: data.heatmap_regions,
+        red_flags: data.red_flags || [],
+        analysis_summary: data.analysis_summary || '',
+        temporal_data: data.temporal_data || [],
+        heatmap_regions: data.heatmap_regions || [],
+        model_scores: data.model_scores || [],
         file_url: preview,
-        file_type: 'image',
+        file_type: data.file_type || 'image',
+        is_deepfake: data.is_deepfake,
+        frames_analyzed: data.frames_analyzed,
         date: new Date().toLocaleDateString(),
       })
 
-      // Signal to ScanLoading that the real scan is done — it will call onComplete at 100%
       setScanDone(true)
     } catch (err) {
       setLoading(false)
       setScanDone(false)
-      alert('Scan failed.')
+      setError(err.message || 'Scan failed. Please try again.')
     }
   }
 
@@ -102,7 +102,7 @@ export default function ImageUpload({ loading, setLoading, scanDone, setScanDone
           {preview ? (
             <>
               <img src={preview} alt="Preview" style={{ maxHeight: '220px', maxWidth: '100%', borderRadius: '8px', objectFit: 'contain' }} />
-              <button onClick={(e) => { e.stopPropagation(); setPreview(null); setSelectedFile(null) }} style={{ fontSize: '0.75rem', color: '#4b5e78', background: 'transparent', border: '1px solid #21293a', borderRadius: '6px', padding: '0.3rem 0.75rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button onClick={(e) => { e.stopPropagation(); setPreview(null); setSelectedFile(null); setError(null) }} style={{ fontSize: '0.75rem', color: '#4b5e78', background: 'transparent', border: '1px solid #21293a', borderRadius: '6px', padding: '0.3rem 0.75rem', cursor: 'pointer', fontFamily: 'inherit' }}>
                 Remove
               </button>
             </>
@@ -123,16 +123,22 @@ export default function ImageUpload({ loading, setLoading, scanDone, setScanDone
                 </svg>
                 Select File
               </button>
-              <p style={{ margin: 0, color: '#2e3d52', fontSize: '0.75rem' }}>Supports: JPEG, PNG</p>
+              <p style={{ margin: 0, color: '#2e3d52', fontSize: '0.75rem' }}>Supports: JPEG, PNG, MP4, MOV, WEBM</p>
             </>
           )}
         </div>
       </div>
 
-      <input ref={fileInputRef} type="file" accept="image/jpeg, image/png" style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files[0])} />
+      {error && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', backgroundColor: '#1f0a0a', border: '1px solid #7f1d1d', borderRadius: '8px', color: '#fca5a5', fontSize: '0.85rem' }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files[0])} />
 
       <button onClick={handleScan} disabled={!selectedFile || loading} style={{ width: '100%', padding: '0.9rem', backgroundColor: selectedFile && !loading ? '#2563eb' : '#161b27', color: selectedFile && !loading ? '#fff' : '#2e3d52', border: `1px solid ${selectedFile && !loading ? '#2563eb' : '#21293a'}`, borderRadius: '10px', fontSize: '0.85rem', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', cursor: selectedFile && !loading ? 'pointer' : 'not-allowed', transition: 'all 0.2s', fontFamily: 'inherit' }}>
-        {loading ? 'Scanning...' : 'Scan Image'}
+        {loading ? 'Scanning...' : 'Scan File'}
       </button>
     </div>
   )

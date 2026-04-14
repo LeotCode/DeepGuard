@@ -11,6 +11,8 @@ const STAGES = [
   { label: 'Finalizing',                 from: 96, to: 100 },
 ]
 
+const MAX_WAIT_MS = 120000 // 2 minute hard timeout
+
 export default function ScanLoading({ scanDone, onComplete }) {
   const { theme } = useTheme()
   const [progress, setProgress]     = useState(0)
@@ -19,15 +21,36 @@ export default function ScanLoading({ scanDone, onComplete }) {
   const stageRef      = useRef(0)
   const scanDoneRef   = useRef(scanDone)
   const completedRef  = useRef(false)
+  const startTimeRef  = useRef(Date.now())
 
   useEffect(() => { scanDoneRef.current = scanDone }, [scanDone])
+
+  // When scanDone becomes true, immediately finish
+  useEffect(() => {
+    if (scanDone && !completedRef.current) {
+      completedRef.current = true
+      currentRef.current = 100
+      setProgress(100)
+      setStageIndex(STAGES.length - 1)
+      setTimeout(() => onComplete?.(), 400)
+    }
+  }, [scanDone])
 
   useEffect(() => {
     const tick = setInterval(() => {
       const stage = STAGES[stageRef.current]
       if (!stage) return
+
+      const elapsed = Date.now() - startTimeRef.current
       const isLastStage = stageRef.current === STAGES.length - 1
-      const remaining   = stage.to - currentRef.current
+
+      // Hard timeout — force complete after MAX_WAIT_MS
+      if (elapsed > MAX_WAIT_MS && !completedRef.current) {
+        completedRef.current = true
+        clearInterval(tick)
+        onComplete?.()
+        return
+      }
 
       if (isLastStage && !scanDoneRef.current) {
         const holdAt = 99
@@ -39,6 +62,7 @@ export default function ScanLoading({ scanDone, onComplete }) {
         return
       }
 
+      const remaining = stage.to - currentRef.current
       const step = Math.max(0.3, remaining * 0.045)
       currentRef.current = Math.min(currentRef.current + step, stage.to)
       setProgress(Math.floor(currentRef.current))
