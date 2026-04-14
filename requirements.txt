@@ -1,0 +1,40 @@
+# DeepGuard Backend — Python dependencies
+# Requires Python 3.9 – 3.11 (recommended: 3.11)
+# TensorFlow does NOT support Python 3.12+ yet.
+#
+# Install:
+#   pip install -r requirements.txt
+#
+# macOS Apple Silicon: works out of the box with the commands above.
+# Windows/Linux GPU: install PyTorch with CUDA separately first:
+#   https://pytorch.org/get-started/locally/
+
+# ── Web framework ──────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# ── Firebase ───────────────────────────────────────────────────────────────
+firebase-admin>=6.5.0
+
+# ── PyTorch ────────────────────────────────────────────────────────────────
+torch>=2.2.0
+torchvision>=0.17.0
+
+# ── TensorFlow (Python 3.9–3.11 only) ─────────────────────────────────────
+# macOS ARM:   installs metal-enabled build automatically
+# Windows/Linux: installs CPU build (add tensorflow-gpu for CUDA)
+tensorflow>=2.15.0,<2.16.0
+tensorflow-hub>=0.16.0
+
+# ── Vision / image processing ──────────────────────────────────────────────
+Pillow>=10.0
+opencv-python-headless>=4.9.0
+
+# ── Numeric ────────────────────────────────────────────────────────────────
+numpy>=1.26,<2.0
+
+# ── Utilities ──────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+pydantic>=2.7.0
+certifi>=2024.0.0
