@@ -5,9 +5,18 @@
 # Install:
 #   pip install -r requirements.txt
 #
-# macOS Apple Silicon: works out of the box with the commands above.
-# Windows/Linux GPU: install PyTorch with CUDA separately first:
-#   https://pytorch.org/get-started/locally/
+# ── OS-specific notes ──────────────────────────────────────────────────────
+# macOS Apple Silicon (M1/M2/M3):
+#   Works out of the box. TensorFlow installs the metal-enabled build.
+#
+# Windows:
+#   Install PyTorch with CUDA first if you have a GPU:
+#     https://pytorch.org/get-started/locally/
+#   Use opencv-python-headless (no GUI deps needed for a backend server).
+#
+# Linux:
+#   Same as Windows. For GPU support add tensorflow[and-cuda] separately.
+#   If running headless (no display), opencv-python-headless is correct.
 
 # ── Web framework ──────────────────────────────────────────────────────────
 fastapi>=0.111.0
@@ -18,20 +27,33 @@ python-multipart>=0.0.9
 firebase-admin>=6.5.0
 
 # ── PyTorch ────────────────────────────────────────────────────────────────
+# CPU build works on all platforms. For GPU, install the CUDA build separately
+# from https://pytorch.org/get-started/locally/ before running pip install.
 torch>=2.2.0
 torchvision>=0.17.0
 
-# ── TensorFlow (Python 3.9–3.11 only) ─────────────────────────────────────
-# macOS ARM:   installs metal-enabled build automatically
-# Windows/Linux: installs CPU build (add tensorflow-gpu for CUDA)
+# ── TensorFlow ─────────────────────────────────────────────────────────────
+# 2.15.x is the last version that ships keras as tensorflow.keras (Keras 2).
+# Capped at <2.16 to avoid the Keras 3 API breaking change.
+# Supports: macOS (x86 + ARM), Windows (x86), Linux (x86).
+# Note: tensorflow 2.15 has no official ARM Linux wheel — use tf-nightly on
+# Raspberry Pi / AWS Graviton, or build from source.
 tensorflow>=2.15.0,<2.16.0
 tensorflow-hub>=0.16.0
 
+# ── HDF5 weight loading ────────────────────────────────────────────────────
+# Used directly in model_runner.py to read layer weights from .keras zip files.
+# h5py 3.x is required by tensorflow 2.15 on all platforms.
+h5py>=3.10.0,<4.0
+
 # ── Vision / image processing ──────────────────────────────────────────────
+# opencv-python-headless has no Qt/GTK GUI dependencies — correct for servers.
+# Works on macOS, Windows, and Linux without needing a display.
 Pillow>=10.0
 opencv-python-headless>=4.9.0
 
 # ── Numeric ────────────────────────────────────────────────────────────────
+# numpy <2.0 required — tensorflow 2.15 is not compatible with numpy 2.x.
 numpy>=1.26,<2.0
 
 # ── Utilities ──────────────────────────────────────────────────────────────
