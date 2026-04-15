@@ -4,66 +4,94 @@ import { useTheme } from '@/context/ThemeContext'
 
 function getStages(fileType) {
   if (fileType === 'video') return [
-    { label: 'Preprocessing video',      from: 0,  to: 18 },
-    { label: 'Extracting frames',        from: 18, to: 38 },
-    { label: 'Analyzing frame sequence', from: 38, to: 58 },
-    { label: 'Running deepfake model',   from: 58, to: 82 },
-    { label: 'Analyzing results',        from: 82, to: 96 },
-    { label: 'Finalizing',               from: 96, to: 100 },
+    { label: 'Preprocessing video',      pct: 15 },
+    { label: 'Extracting frames',        pct: 25 },
+    { label: 'Analyzing frame sequence', pct: 20 },
+    { label: 'Running deepfake model',   pct: 25 },
+    { label: 'Analyzing results',        pct: 10 },
+    { label: 'Finalizing',               pct: 5  },
   ]
   if (fileType === 'audio') return [
-    { label: 'Preprocessing audio',       from: 0,  to: 18 },
-    { label: 'Extracting audio features', from: 18, to: 38 },
-    { label: 'Analyzing patterns',        from: 38, to: 58 },
-    { label: 'Running deepfake model',    from: 58, to: 82 },
-    { label: 'Analyzing results',         from: 82, to: 96 },
-    { label: 'Finalizing',                from: 96, to: 100 },
+    { label: 'Preprocessing audio',       pct: 15 },
+    { label: 'Extracting audio features', pct: 25 },
+    { label: 'Analyzing patterns',        pct: 20 },
+    { label: 'Running deepfake model',    pct: 25 },
+    { label: 'Analyzing results',         pct: 10 },
+    { label: 'Finalizing',               pct: 5  },
   ]
   return [
-    { label: 'Preprocessing image',        from: 0,  to: 18 },
-    { label: 'Detecting faces',            from: 18, to: 38 },
-    { label: 'Extracting facial features', from: 38, to: 58 },
-    { label: 'Running deepfake model',     from: 58, to: 82 },
-    { label: 'Analyzing results',          from: 82, to: 96 },
-    { label: 'Finalizing',                 from: 96, to: 100 },
+    { label: 'Preprocessing image',        pct: 15 },
+    { label: 'Detecting faces',            pct: 20 },
+    { label: 'Extracting facial features', pct: 20 },
+    { label: 'Running deepfake model',     pct: 30 },
+    { label: 'Analyzing results',          pct: 10 },
+    { label: 'Finalizing',                pct: 5  },
   ]
 }
 
-const MAX_WAIT_MS = 120000 // 2 minute hard timeout
+// Expected scan durations in ms — progress paces itself to reach ~92%
+// by this time, leaving headroom for the real response to arrive.
+const EXPECTED_MS = {
+  image: 8000,
+  video: 25000,
+  audio: 12000,
+}
+
+const MAX_WAIT_MS = 120000
 
 export default function ScanLoading({ scanDone, onComplete, fileType = 'image' }) {
   const { theme } = useTheme()
   const STAGES = getStages(fileType)
+
+  // Build cumulative breakpoints from pct weights
+  const breakpoints = STAGES.reduce((acc, s, i) => {
+    const prev = acc[i - 1] ?? 0
+    acc.push(prev + s.pct)
+    return acc
+  }, []).map(v => (v / 100) * 92) // scale to 92% max so we hold for real response
+
   const [progress, setProgress]     = useState(0)
   const [stageIndex, setStageIndex] = useState(0)
-  const currentRef    = useRef(0)
-  const stageRef      = useRef(0)
+  const progressRef   = useRef(0)
   const scanDoneRef   = useRef(scanDone)
   const completedRef  = useRef(false)
   const startTimeRef  = useRef(Date.now())
+  const expectedMs    = EXPECTED_MS[fileType] ?? EXPECTED_MS.image
 
   useEffect(() => { scanDoneRef.current = scanDone }, [scanDone])
 
-  // When scanDone becomes true, immediately finish
+  // When scan finishes, animate smoothly to 100% then navigate
   useEffect(() => {
-    if (scanDone && !completedRef.current) {
-      completedRef.current = true
-      currentRef.current = 100
-      setProgress(100)
+    if (!scanDone || completedRef.current) return
+    completedRef.current = true
+
+    // Animate from current to 100% over 500ms
+    const start    = progressRef.current
+    const startTs  = performance.now()
+    const duration = 500
+
+    const animate = (now) => {
+      const t = Math.min((now - startTs) / duration, 1)
+      const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t // ease-in-out
+      const val = Math.round(start + (100 - start) * eased)
+      progressRef.current = val
+      setProgress(val)
       setStageIndex(STAGES.length - 1)
-      setTimeout(() => onComplete?.(), 400)
+      if (t < 1) requestAnimationFrame(animate)
+      else setTimeout(() => onComplete?.(), 150)
     }
+    requestAnimationFrame(animate)
   }, [scanDone])
 
+  // Time-based progress: advance smoothly toward 92% over expectedMs
   useEffect(() => {
     const tick = setInterval(() => {
-      const stage = STAGES[stageRef.current]
-      if (!stage) return
+      if (completedRef.current) { clearInterval(tick); return }
 
-      const elapsed = Date.now() - startTimeRef.current
-      const isLastStage = stageRef.current === STAGES.length - 1
+      const elapsed  = Date.now() - startTimeRef.current
+      const fraction = Math.min(elapsed / expectedMs, 1)
 
-      // Hard timeout — force complete after MAX_WAIT_MS
+      // Hard timeout
       if (elapsed > MAX_WAIT_MS && !completedRef.current) {
         completedRef.current = true
         clearInterval(tick)
@@ -71,36 +99,30 @@ export default function ScanLoading({ scanDone, onComplete, fileType = 'image' }
         return
       }
 
-      if (isLastStage && !scanDoneRef.current) {
-        const holdAt = 99
-        if (currentRef.current < holdAt) {
-          const step = Math.max(0.2, (holdAt - currentRef.current) * 0.04)
-          currentRef.current = Math.min(currentRef.current + step, holdAt)
-          setProgress(Math.floor(currentRef.current))
+      // Ease the fraction so it slows near the ceiling (never reaches 92% before scan done)
+      const eased   = 1 - Math.pow(1 - fraction, 2.2)
+      const target  = Math.min(eased * 92, 92)
+      const current = progressRef.current
+
+      // Smooth toward target — never go backwards
+      if (target > current) {
+        const next = Math.min(current + Math.max(0.3, (target - current) * 0.12), target)
+        progressRef.current = next
+        setProgress(Math.floor(next))
+
+        // Update stage based on breakpoints
+        for (let i = breakpoints.length - 1; i >= 0; i--) {
+          if (next >= breakpoints[i]) {
+            if (i + 1 !== stageIndex) setStageIndex(Math.min(i + 1, STAGES.length - 1))
+            break
+          }
         }
-        return
-      }
-
-      const remaining = stage.to - currentRef.current
-      const step = Math.max(0.3, remaining * 0.045)
-      currentRef.current = Math.min(currentRef.current + step, stage.to)
-      setProgress(Math.floor(currentRef.current))
-
-      if (currentRef.current >= stage.to && stageRef.current < STAGES.length - 1) {
-        stageRef.current++
-        setStageIndex(stageRef.current)
-      }
-
-      if (currentRef.current >= 100 && !completedRef.current) {
-        completedRef.current = true
-        clearInterval(tick)
-        setTimeout(() => onComplete?.(), 300)
       }
     }, 80)
     return () => clearInterval(tick)
-  }, [])
+  }, [expectedMs])
 
-  const currentStage = STAGES[stageIndex]
+  const currentStage = STAGES[stageIndex] ?? STAGES[STAGES.length - 1]
 
   return (
     <div style={{ width: '100%', maxWidth: '760px', marginTop: '1.5rem', fontFamily: "'Jost', sans-serif" }}>

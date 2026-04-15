@@ -46,12 +46,12 @@ export default function Settings() {
   // Since only darkMode is implemented, we'll handle others later if needed
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: theme.bg, padding: '3rem 2rem', fontFamily: FONT, transition: 'background-color 0.3s ease' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: theme.bg, padding: '1.5rem 2rem', fontFamily: FONT, transition: 'background-color 0.3s ease' }}>
       <div style={{ maxWidth: '680px', margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ marginBottom: '2.5rem' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900', color: theme.text, margin: 0, transition: 'color 0.3s ease' }}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: '900', color: theme.text, margin: 0, transition: 'color 0.3s ease' }}>
             <span style={{ color: theme.primary, transition: 'color 0.3s ease' }}>Settings</span>
           </h1>
           <p style={{ color: MUTED, marginTop: '0.4rem', fontSize: '0.95rem' }}>
@@ -60,7 +60,7 @@ export default function Settings() {
         </div>
 
         {/* Settings cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {SETTINGS.map(({ key, label, description }) => (
             <div
               key={key}
@@ -68,7 +68,7 @@ export default function Settings() {
                 backgroundColor: theme.cardBg, 
                 border: `1px solid ${theme.border}`, 
                 borderRadius: '14px', 
-                padding: '1.4rem 1.5rem', 
+                padding: '1rem 1.25rem', 
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'center', 
@@ -93,9 +93,9 @@ export default function Settings() {
         {/* Save button - maybe not needed if auto-save */}
         <button
           style={{ 
-            marginTop: '2rem', 
+            marginTop: '1.25rem', 
             width: '100%', 
-            padding: '0.9rem', 
+            padding: '0.75rem', 
             backgroundColor: theme.primary, 
             color: '#fff', 
             border: 'none', 

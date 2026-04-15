@@ -22,6 +22,7 @@ export default function Home() {
   const [dragging, setDragging]         = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [fileType, setFileType]         = useState('image')
+  const [thumbnail, setThumbnail]       = useState(null)
   const [error, setError]               = useState(null)
   const fileInputRef = useRef(null)
   const { addResult } = useResults()
@@ -34,13 +35,55 @@ export default function Home() {
     setFileType(ft)
     setError(null)
     if (ft === 'image') {
-      // Images: use base64 — survives navigation and localStorage serialisation
       const reader = new FileReader()
       reader.onload = (e) => setPreview(e.target.result)
       reader.readAsDataURL(file)
+    } else if (ft === 'video') {
+      const blobUrl = URL.createObjectURL(file)
+      setPreview(blobUrl)
+
+      // Capture a thumbnail — must wait for metadata to get duration,
+      // then seek, then draw on the seeked event.
+      const vid = document.createElement('video')
+      vid.muted = true
+      vid.playsInline = true
+      vid.preload = 'metadata'
+
+      const drawFrame = () => {
+        try {
+          const w = vid.videoWidth  || 640
+          const h = vid.videoHeight || 360
+          const canvas = document.createElement('canvas')
+          canvas.width  = w
+          canvas.height = h
+          canvas.getContext('2d').drawImage(vid, 0, 0, w, h)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+          // Only accept if we actually got image data (not a blank frame)
+          if (dataUrl && dataUrl.length > 5000) setThumbnail(dataUrl)
+        } catch (_) {}
+      }
+
+      vid.addEventListener('loadedmetadata', () => {
+        // Seek to 10% or 1s, whichever is smaller
+        vid.currentTime = Math.min(1, (vid.duration || 10) * 0.1)
+      })
+
+      vid.addEventListener('seeked', () => {
+        drawFrame()
+        vid.src = ''
+      })
+
+      // Fallback: if seeked never fires (some browsers/codecs),
+      // try drawing immediately when enough data is available
+      vid.addEventListener('canplay', () => {
+        if (!vid.currentTime) {
+          drawFrame()
+        }
+      })
+
+      vid.src = blobUrl
+      vid.load()
     } else {
-      // Video/audio: blob URL works fine on this page (same session).
-      // We store the File object ref so we can recreate it for the result page.
       setPreview(URL.createObjectURL(file))
     }
   }
@@ -91,6 +134,7 @@ export default function Home() {
         scan_id: data.scan_id,
         filename: selectedFile.name,
         preview,
+        thumbnail: thumbnail || preview,
         predictions: data.predictions || [],
         total_faces: data.total_faces ?? 0,
         ai_score: data.ai_score,
@@ -187,7 +231,7 @@ export default function Home() {
                 ) : (
                   <img src={preview} alt="Preview" style={{ maxHeight: '250px', maxWidth: '100%', borderRadius: '12px', objectFit: 'contain' }} />
                 )}
-                <button onClick={(e) => { e.stopPropagation(); setPreview(null); setSelectedFile(null); setFileType('image'); setError(null) }} style={{ fontSize: '0.9rem', color: theme.muted, background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: '8px', padding: '0.45rem 0.95rem', cursor: 'pointer', fontFamily: FONT, transition: 'color 0.3s ease, border-color 0.3s ease' }}>Remove</button>
+                <button onClick={(e) => { e.stopPropagation(); setPreview(null); setSelectedFile(null); setFileType('image'); setThumbnail(null); setError(null) }} style={{ fontSize: '0.9rem', color: theme.muted, background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: '8px', padding: '0.45rem 0.95rem', cursor: 'pointer', fontFamily: FONT, transition: 'color 0.3s ease, border-color 0.3s ease' }}>Remove</button>
               </>
             ) : (
               <>

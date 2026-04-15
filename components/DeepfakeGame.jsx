@@ -53,17 +53,17 @@ export default function DeepfakeGame() {
       border: `1px solid ${theme.border}`,
       boxShadow: theme.boxShadow,
       padding: '0.8rem',
-      maxWidth: '700px',
+      maxWidth: '520px',
       margin: '0 auto',
       transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease'
     }}>
-      <p style={{ color: theme.primary, fontSize: '1.08rem', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase', margin: '0 0 1rem', fontFamily: FONT }}>
+      <p style={{ color: theme.primary, fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 0.6rem', fontFamily: FONT }}>
         Deepfakes often deceive the naked eye
       </p>
-      <h2 style={{ margin: '0 0 1.1rem', fontSize: '1.4rem', fontWeight: '900', color: theme.text, fontFamily: FONT }}>
+      <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem', fontWeight: '900', color: theme.text, fontFamily: FONT }}>
         Can You Spot The Deepfake?
       </h2>
-      <p style={{ color: theme.muted, fontSize: '0.85rem', lineHeight: 1.8, margin: '0 0 1.75rem', maxWidth: '760px', fontFamily: FONT }}>
+      <p style={{ color: theme.muted, fontSize: '0.82rem', lineHeight: 1.6, margin: '0 0 1rem', maxWidth: '760px', fontFamily: FONT }}>
         Look at the image, decide whether it is real or fake, and see the answer instantly.
       </p>
 
@@ -73,9 +73,9 @@ export default function DeepfakeGame() {
         background: theme.bg,
         border: `1px solid ${theme.border}`,
         width: '100%',
-        maxWidth: '250px',
+        maxWidth: '200px',
         aspectRatio: '1 / 1',
-        margin: '0 auto 1.25rem'
+        margin: '0 auto 1rem'
       }}>
         <img
           src={currentGameImage.src}
@@ -84,29 +84,29 @@ export default function DeepfakeGame() {
         />
       </div>
 
-      <div style={{ display: 'flex', gap: '1.2rem', marginBottom: '1.2rem' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem' }}>
         <button
           onClick={() => handleGuess('REAL')}
-          style={{ flex: 1, padding: '0.8rem 0.9rem', background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)', color: '#ecfeff', border: '1px solid rgba(153, 246, 228, 0.25)', borderRadius: '14px', fontSize: '1.15rem', fontWeight: '800', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 14px 24px rgba(15, 118, 110, 0.28)' }}
+          style={{ flex: 1, padding: '0.65rem 0.9rem', background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)', color: '#ecfeff', border: '1px solid rgba(153, 246, 228, 0.25)', borderRadius: '14px', fontSize: '0.9rem', fontWeight: '800', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 8px 16px rgba(15, 118, 110, 0.28)' }}
         >
           REAL
         </button>
         <button
           onClick={() => handleGuess('FAKE')}
-          style={{ flex: 1, padding: '0.8rem 0.9rem', background: 'linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)', color: '#fff1f2', border: '1px solid rgba(254, 202, 202, 0.22)', borderRadius: '14px', fontSize: '1.15rem', fontWeight: '800', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 14px 24px rgba(127, 29, 29, 0.3)' }}
+          style={{ flex: 1, padding: '0.65rem 0.9rem', background: 'linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)', color: '#fff1f2', border: '1px solid rgba(254, 202, 202, 0.22)', borderRadius: '14px', fontSize: '0.9rem', fontWeight: '800', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 8px 16px rgba(127, 29, 29, 0.3)' }}
         >
           FAKE
         </button>
       </div>
 
       {gameResult && (
-        <div style={{ backgroundColor: gameResult.background, color: gameResult.tone, border: `1px solid ${gameResult.border}`, borderRadius: '16px', padding: '0.8rem 0.9rem', marginBottom: '1.2rem' }}>
+        <div style={{ backgroundColor: gameResult.background, color: gameResult.tone, border: `1px solid ${gameResult.border}`, borderRadius: '16px', padding: '0.65rem 0.9rem', marginBottom: '0.75rem' }}>
           <p style={{ margin: '0 0 0.45rem', fontSize: '0.85rem', fontWeight: '800', fontFamily: FONT }}>{gameResult.message}</p>
           <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.7, fontFamily: FONT }}>{gameResult.explanation}</p>
         </div>
       )}
 
-      <button onClick={handleNextRound} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: DEEP_GRADIENT, color: '#fff', border: 'none', borderRadius: '12px', padding: '0.75rem 1.2rem', fontSize: '1.08rem', fontWeight: '700', cursor: 'pointer', fontFamily: FONT, transition: 'background 0.2s', boxShadow: '0 14px 28px rgba(15, 37, 87, 0.16)' }} onMouseEnter={e => e.currentTarget.style.background = DEEP_GRADIENT_HOVER} onMouseLeave={e => e.currentTarget.style.background = DEEP_GRADIENT}>
+      <button onClick={handleNextRound} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: DEEP_GRADIENT, color: '#fff', border: 'none', borderRadius: '12px', padding: '0.55rem 1rem', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer', fontFamily: FONT, transition: 'background 0.2s', boxShadow: '0 14px 28px rgba(15, 37, 87, 0.16)' }} onMouseEnter={e => e.currentTarget.style.background = DEEP_GRADIENT_HOVER} onMouseLeave={e => e.currentTarget.style.background = DEEP_GRADIENT}>
         Next Image
       </button>
     </div>
