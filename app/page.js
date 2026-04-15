@@ -21,6 +21,7 @@ export default function Home() {
   const [preview, setPreview]           = useState(null)
   const [dragging, setDragging]         = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [fileType, setFileType]         = useState('image')
   const [error, setError]               = useState(null)
   const fileInputRef = useRef(null)
   const { addResult } = useResults()
@@ -28,9 +29,20 @@ export default function Home() {
 
   const handleFile = (file) => {
     if (!file) return
+    const ft = file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'image'
     setSelectedFile(file)
-    setPreview(URL.createObjectURL(file))
+    setFileType(ft)
     setError(null)
+    if (ft === 'image') {
+      // Images: use base64 — survives navigation and localStorage serialisation
+      const reader = new FileReader()
+      reader.onload = (e) => setPreview(e.target.result)
+      reader.readAsDataURL(file)
+    } else {
+      // Video/audio: blob URL works fine on this page (same session).
+      // We store the File object ref so we can recreate it for the result page.
+      setPreview(URL.createObjectURL(file))
+    }
   }
 
   const handleDrop = (e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }
@@ -63,6 +75,17 @@ export default function Home() {
       const id = data.scan_id || Date.now()
       setPendingId(id)
 
+      // For video/audio: store blob URL in sessionStorage so the result page
+      // can retrieve it without needing localStorage (which can't hold large blobs).
+      // sessionStorage survives navigation within the same tab.
+      let resultFileUrl = preview
+      if (selectedFile && (selectedFile.type.startsWith('video/') || selectedFile.type.startsWith('audio/'))) {
+        // Re-create a fresh blob URL from the original File object
+        const freshBlobUrl = URL.createObjectURL(selectedFile)
+        try { sessionStorage.setItem(`deepguard_video_${id}`, freshBlobUrl) } catch (_) {}
+        resultFileUrl = freshBlobUrl
+      }
+
       addResult({
         id,
         scan_id: data.scan_id,
@@ -77,7 +100,7 @@ export default function Home() {
         temporal_data: data.temporal_data || [],
         heatmap_regions: data.heatmap_regions || [],
         model_scores: data.model_scores || [],
-        file_url: preview,
+        file_url: resultFileUrl,
         file_type: data.file_type || 'image',
         is_deepfake: data.is_deepfake,
         frames_analyzed: data.frames_analyzed,
@@ -152,8 +175,19 @@ export default function Home() {
           >
             {preview ? (
               <>
-                <img src={preview} alt="Preview" style={{ maxHeight: '250px', maxWidth: '100%', borderRadius: '12px', objectFit: 'contain' }} />
-                <button onClick={(e) => { e.stopPropagation(); setPreview(null); setSelectedFile(null); setError(null) }} style={{ fontSize: '0.9rem', color: theme.muted, background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: '8px', padding: '0.45rem 0.95rem', cursor: 'pointer', fontFamily: FONT, transition: 'color 0.3s ease, border-color 0.3s ease' }}>Remove</button>
+                {fileType === 'video' ? (
+                  <video src={preview} controls playsInline style={{ width: '100%', height: 'auto', maxHeight: '280px', borderRadius: '12px', backgroundColor: '#000', display: 'block' }} />
+                ) : fileType === 'audio' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', width: '100%' }}>
+                    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                    </svg>
+                    <audio src={preview} controls style={{ width: '100%', maxWidth: '340px' }} />
+                  </div>
+                ) : (
+                  <img src={preview} alt="Preview" style={{ maxHeight: '250px', maxWidth: '100%', borderRadius: '12px', objectFit: 'contain' }} />
+                )}
+                <button onClick={(e) => { e.stopPropagation(); setPreview(null); setSelectedFile(null); setFileType('image'); setError(null) }} style={{ fontSize: '0.9rem', color: theme.muted, background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: '8px', padding: '0.45rem 0.95rem', cursor: 'pointer', fontFamily: FONT, transition: 'color 0.3s ease, border-color 0.3s ease' }}>Remove</button>
               </>
             ) : (
               <>
@@ -161,7 +195,7 @@ export default function Home() {
                   <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
                   <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
                 </svg>
-                <p style={{ margin: 0, fontWeight: '600', fontSize: '0.95rem', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Drop image file here or click to browse</p>
+                <p style={{ margin: 0, fontWeight: '600', fontSize: '0.95rem', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Drop image, video, or audio here</p>
                 <button onClick={(e) => { e.stopPropagation(); fileInputRef.current.click() }} style={{ marginTop: '0.25rem', padding: '0.6rem 1.5rem', background: DEEP_GRADIENT, color: '#fff', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer', fontFamily: FONT, boxShadow: '0 10px 22px rgba(15, 37, 87, 0.16)' }}>
                   Browse Files
                 </button>
@@ -204,7 +238,7 @@ export default function Home() {
 
       {loading && (
         <div id="scan-loading" style={{ maxWidth: '760px', margin: '0 auto', padding: '0 1rem 2rem' }}>
-          <ScanLoading scanDone={scanDone} onComplete={handleScanComplete} />
+          <ScanLoading scanDone={scanDone} onComplete={handleScanComplete} fileType={fileType} />
         </div>
       )}
 

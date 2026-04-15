@@ -8,19 +8,19 @@ const DEEP_GRADIENT_HOVER = 'linear-gradient(135deg, #163d86 0%, #2454b8 100%)'
 
 const GAME_IMAGES = [
   {
-    src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/400px-Camponotus_flavomarginatus_ant.jpg',
+    src: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     label: 'REAL',
     explanation: 'Correct answer: REAL. Natural texture and lighting are consistent across the frame.',
   },
-  {
-    src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/400px-PNG_transparency_demonstration_1.png',
+  { 
+    src: 'https://thispersonnotexist.org/downloadimage/Ac3RhdGljL21hbi9zZWVkMTUxNzMuanBlZw==',
     label: 'FAKE',
-    explanation: 'Correct answer: FAKE. The image shows synthetic compositing cues and unnatural edge blending.',
+    explanation: 'Correct answer: FAKE. Skin texture looks overly smooth and uniform in some areas.',
   },
   {
-    src: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80',
+    src: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     label: 'REAL',
-    explanation: 'Correct answer: REAL. Facial geometry, skin texture, and shadows remain coherent.',
+    explanation: 'Correct answer: REAL. Lighting is natural and reflections are accurate.',
   },
 ]
 

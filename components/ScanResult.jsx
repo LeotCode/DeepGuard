@@ -153,49 +153,96 @@ function TimelineGraph({ data }) {
   )
 }
 
-function HeatmapDisplay({ fileUrl, regions }) {
+function HeatmapDisplay({ fileUrl, fileType, regions }) {
   const { theme } = useTheme()
   const [show, setShow] = useState(true)
+  const isImage = !fileType || fileType === 'image'
   const getColor = (i) => i >= 0.7 ? { fill: 'rgba(239,68,68,0.3)', stroke: '#ef4444' } : i >= 0.4 ? { fill: 'rgba(245,158,11,0.3)', stroke: '#f59e0b' } : { fill: 'rgba(34,197,94,0.3)', stroke: '#22c55e' }
 
   return (
     <Card>
       <CardHeader>
         <div>
-          <CardTitle>Spatial Heatmap Analysis</CardTitle>
-          <p style={{ margin: '2px 0 0', fontSize: '0.9rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>Highlighted regions show potential AI manipulation</p>
+          <CardTitle>{isImage ? 'Spatial Heatmap Analysis' : 'Media Preview'}</CardTitle>
+          <p style={{ margin: '2px 0 0', fontSize: '0.9rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>
+            {isImage ? 'Highlighted regions show potential AI manipulation' : 'Scanned media file'}
+          </p>
         </div>
-        <button onClick={() => setShow(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: theme.bg, border: `1px solid ${theme.border}`, color: theme.muted, borderRadius: '10px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.9rem', fontFamily: FONT, fontWeight: '600', transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease' }}>
-          {show ? 'Hide' : 'Show'}
-        </button>
+        {isImage && (
+          <button onClick={() => setShow(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: theme.bg, border: `1px solid ${theme.border}`, color: theme.muted, borderRadius: '10px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.9rem', fontFamily: FONT, fontWeight: '600', transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease' }}>
+            {show ? 'Hide' : 'Show'}
+          </button>
+        )}
       </CardHeader>
       <CardBody>
-        <div style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', backgroundColor: theme.bg, border: `1px solid ${theme.border}`, maxHeight: '420px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
-          {fileUrl ? <img src={fileUrl} alt="Analysis" style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', display: 'block' }} /> : <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.muted, fontSize: '0.95rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>No image preview</div>}
-          {show && (
-            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-              {regions.map((r, i) => { const c = getColor(r.intensity); return <rect key={i} x={`${r.x}%`} y={`${r.y}%`} width={`${r.width}%`} height={`${r.height}%`} fill={c.fill} stroke={c.stroke} strokeWidth="2" /> })}
-            </svg>
+        {/* Media area */}
+        <div style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', backgroundColor: '#000', border: `1px solid ${theme.border}`, transition: 'border-color 0.3s ease' }}>
+          {fileUrl ? (
+            fileType === 'video' ? (
+              // Use a wrapper div with intrinsic aspect ratio so portrait (9:16)
+              // and landscape (16:9) videos both display correctly without black bars.
+              // The video fills the wrapper; the browser picks the right height from metadata.
+              <div style={{ position: 'relative', width: '100%' }}>
+                <video
+                  src={fileUrl}
+                  controls
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    // max-height caps landscape; height:auto lets portrait expand naturally
+                    maxHeight: '520px',
+                    height: 'auto',
+                    backgroundColor: '#000',
+                  }}
+                />
+              </div>
+            ) : fileType === 'audio' ? (
+              <div style={{ padding: '2.5rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', backgroundColor: theme.bg }}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                </svg>
+                <audio src={fileUrl} controls style={{ width: '100%', maxWidth: '420px' }} />
+              </div>
+            ) : (
+              // Image with heatmap overlay
+              <div style={{ position: 'relative' }}>
+                <img src={fileUrl} alt="Analysis" style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', display: 'block' }} />
+                {show && regions.length > 0 && (
+                  <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                    {regions.map((r, i) => { const c = getColor(r.intensity); return <rect key={i} x={`${r.x}%`} y={`${r.y}%`} width={`${r.width}%`} height={`${r.height}%`} fill={c.fill} stroke={c.stroke} strokeWidth="2" /> })}
+                  </svg>
+                )}
+              </div>
+            )
+          ) : (
+            <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.muted, fontSize: '0.95rem', fontFamily: FONT, backgroundColor: theme.bg }}>
+              No preview available
+            </div>
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1.75rem', marginTop: '1.2rem' }}>
-          {[{ color: '#ef4444', bg: 'rgba(239,68,68,0.2)', label: 'High' }, { color: '#f59e0b', bg: 'rgba(245,158,11,0.2)', label: 'Medium' }, { color: '#22c55e', bg: 'rgba(34,197,94,0.2)', label: 'Low' }].map(({ color, bg, label }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: bg, border: `2px solid ${color}` }} />
-              <span style={{ fontSize: '0.92rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>{label}</span>
+        {/* Legend + stats — only relevant for images */}
+        {isImage && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '1.75rem', marginTop: '1.2rem' }}>
+              {[{ color: '#ef4444', bg: 'rgba(239,68,68,0.2)', label: 'High' }, { color: '#f59e0b', bg: 'rgba(245,158,11,0.2)', label: 'Medium' }, { color: '#22c55e', bg: 'rgba(34,197,94,0.2)', label: 'Low' }].map(({ color, bg, label }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: bg, border: `2px solid ${color}` }} />
+                  <span style={{ fontSize: '0.92rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>{label}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem', marginTop: '1.2rem' }}>
-          {[{ label: 'Total Regions', value: regions.length, color: theme.text }, { label: 'High Risk Areas', value: regions.filter(r => r.intensity >= 0.7).length, color: '#ef4444' }].map(({ label, value, color }) => (
-            <div key={label} style={{ backgroundColor: theme.bg, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '1rem 1.1rem', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
-              <p style={{ margin: '0 0 5px', fontSize: '0.78rem', color: theme.muted, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: FONT, transition: 'color 0.3s ease' }}>{label}</p>
-              <p style={{ margin: 0, fontSize: '1.7rem', fontWeight: '700', color, fontFamily: FONT }}>{value}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem', marginTop: '1.2rem' }}>
+              {[{ label: 'Total Regions', value: regions.length, color: theme.text }, { label: 'High Risk Areas', value: regions.filter(r => r.intensity >= 0.7).length, color: '#ef4444' }].map(({ label, value, color }) => (
+                <div key={label} style={{ backgroundColor: theme.bg, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '1rem 1.1rem', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
+                  <p style={{ margin: '0 0 5px', fontSize: '0.78rem', color: theme.muted, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: FONT, transition: 'color 0.3s ease' }}>{label}</p>
+                  <p style={{ margin: 0, fontSize: '1.7rem', fontWeight: '700', color, fontFamily: FONT }}>{value}</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </CardBody>
     </Card>
   )
@@ -288,7 +335,13 @@ export default function ScanResult({ result }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.5rem', alignItems: 'start' }}>
         <div>
           {result.temporal_data?.length > 0 && <TimelineGraph data={result.temporal_data} />}
-          {result.heatmap_regions?.length > 0 && <HeatmapDisplay fileUrl={result.file_url} regions={result.heatmap_regions} />}
+          {(result.file_type === 'video' || result.file_type === 'audio' || result.heatmap_regions?.length > 0) && (
+            <HeatmapDisplay
+              fileUrl={result.file_url}
+              fileType={result.file_type}
+              regions={result.heatmap_regions || []}
+            />
+          )}
         </div>
         <div>
           {result.red_flags?.length > 0 && <RedFlagsList flags={result.red_flags} />}

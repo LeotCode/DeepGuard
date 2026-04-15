@@ -2,19 +2,38 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 
-const STAGES = [
-  { label: 'Preprocessing image',        from: 0,  to: 18 },
-  { label: 'Detecting faces',            from: 18, to: 38 },
-  { label: 'Extracting facial features', from: 38, to: 58 },
-  { label: 'Running deepfake model',     from: 58, to: 82 },
-  { label: 'Analyzing results',          from: 82, to: 96 },
-  { label: 'Finalizing',                 from: 96, to: 100 },
-]
+function getStages(fileType) {
+  if (fileType === 'video') return [
+    { label: 'Preprocessing video',      from: 0,  to: 18 },
+    { label: 'Extracting frames',        from: 18, to: 38 },
+    { label: 'Analyzing frame sequence', from: 38, to: 58 },
+    { label: 'Running deepfake model',   from: 58, to: 82 },
+    { label: 'Analyzing results',        from: 82, to: 96 },
+    { label: 'Finalizing',               from: 96, to: 100 },
+  ]
+  if (fileType === 'audio') return [
+    { label: 'Preprocessing audio',       from: 0,  to: 18 },
+    { label: 'Extracting audio features', from: 18, to: 38 },
+    { label: 'Analyzing patterns',        from: 38, to: 58 },
+    { label: 'Running deepfake model',    from: 58, to: 82 },
+    { label: 'Analyzing results',         from: 82, to: 96 },
+    { label: 'Finalizing',                from: 96, to: 100 },
+  ]
+  return [
+    { label: 'Preprocessing image',        from: 0,  to: 18 },
+    { label: 'Detecting faces',            from: 18, to: 38 },
+    { label: 'Extracting facial features', from: 38, to: 58 },
+    { label: 'Running deepfake model',     from: 58, to: 82 },
+    { label: 'Analyzing results',          from: 82, to: 96 },
+    { label: 'Finalizing',                 from: 96, to: 100 },
+  ]
+}
 
 const MAX_WAIT_MS = 120000 // 2 minute hard timeout
 
-export default function ScanLoading({ scanDone, onComplete }) {
+export default function ScanLoading({ scanDone, onComplete, fileType = 'image' }) {
   const { theme } = useTheme()
+  const STAGES = getStages(fileType)
   const [progress, setProgress]     = useState(0)
   const [stageIndex, setStageIndex] = useState(0)
   const currentRef    = useRef(0)
