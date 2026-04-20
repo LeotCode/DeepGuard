@@ -91,10 +91,10 @@ function ScoreDisplay({ result }) {
             <div style={{ backgroundColor: cfg.badgeBg, border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '1.2rem', transition: 'border-color 0.3s ease' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
                 <span style={{ fontSize: '0.9rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>Confidence Level</span>
-                <span style={{ fontSize: '1.12rem', fontWeight: '700', color: cfg.scoreColor, fontFamily: FONT }}>{result.confidence}%</span>
+                <span style={{ fontSize: '1.12rem', fontWeight: '700', color: cfg.scoreColor, fontFamily: FONT }}>{result.confidence != null ? `${Number(result.confidence).toFixed(1)}%` : '—'}</span>
               </div>
               <div style={{ height: '8px', backgroundColor: theme.border, borderRadius: '99px', overflow: 'hidden', transition: 'background-color 0.3s ease' }}>
-                <div style={{ height: '100%', width: `${result.confidence}%`, backgroundColor: cfg.scoreColor, borderRadius: '99px', transition: 'width 1s ease' }} />
+                <div style={{ height: '100%', width: `${result.confidence ?? 0}%`, backgroundColor: cfg.scoreColor, borderRadius: '99px', transition: 'width 1s ease' }} />
               </div>
             </div>
 
@@ -292,7 +292,7 @@ function FileDetails({ result }) {
       <CardHeader><CardTitle>File Details</CardTitle></CardHeader>
       <CardBody>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {[{ label: 'Type', value: result.file_type || 'Image' }, { label: 'Confidence', value: `${result.confidence}%` }, { label: 'Faces Detected', value: result.total_faces }].map(({ label, value }) => (
+          {[{ label: 'Type', value: result.file_type || 'Image' }, { label: 'Confidence', value: result.confidence != null ? `${Number(result.confidence).toFixed(1)}%` : '—' }, { label: 'Faces Detected', value: result.total_faces }].map(({ label, value }) => (
             <div key={label}>
               <p style={{ margin: '0 0 3px', fontSize: '0.82rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>{label}</p>
               <p style={{ margin: 0, fontWeight: '700', color: theme.text, textTransform: 'capitalize', fontSize: '1.04rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>{value}</p>
