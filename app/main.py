@@ -154,7 +154,7 @@ async def scan_file(
 # ──────────────────────────────────────────────
 # GET /results  — fetch scan history
 # ──────────────────────────────────────────────
-@app.get("/results", response_model=list[ScanHistoryItem])
+@app.get("/results", response_model=list[ScanHistoryItem])  # ScanHistoryItem now contains full fields
 def get_results(token_data: dict = Depends(verify_token)):
     """Return all past scans for the authenticated user, newest first."""
     user_id = token_data["uid"]

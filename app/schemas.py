@@ -60,13 +60,19 @@ class ScanResult(BaseModel):
 
 
 class ScanHistoryItem(BaseModel):
-    """Lighter version returned in list endpoints."""
+    """Full scan data returned in list endpoint — same as ScanResult minus user_id."""
     scan_id: str
     filename: str
     file_type: str
     created_at: str
     ai_score: float
+    confidence: float
     is_deepfake: bool
     total_faces: Optional[int] = None
     frames_analyzed: Optional[int] = None
     predictions: Optional[List[Any]] = None
+    model_scores: Optional[List[Any]] = None
+    temporal_data: Optional[List[Any]] = None
+    red_flags: Optional[List[str]] = None
+    analysis_summary: Optional[str] = None
+    heatmap_regions: Optional[List[Any]] = None
