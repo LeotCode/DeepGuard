@@ -6,6 +6,7 @@ import { useResults } from '@/context/ResultsContext'
 import { useTheme } from '@/context/ThemeContext'
 import ScanLoading from '@/components/ScanLoading'
 import BlogCarousel from '@/components/BlogCarousel'
+import FAQ from '@/components/FAQ'
 import { auth } from '@/lib/firebase'
 
 const DEEP_GRADIENT = 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)'
@@ -287,6 +288,7 @@ export default function Home() {
       )}
 
       {!loading && <BlogCarousel />}
+      {!loading && <FAQ />}
     </div>
   )
 }

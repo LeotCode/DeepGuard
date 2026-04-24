@@ -265,7 +265,7 @@ function RedFlagsList({ flags }) {
             : flags.map((flag, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '0.95rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0, marginTop: '7px' }} />
-                <p style={{ margin: 0, color: theme.text, fontSize: '1rem', lineHeight: 1.65, fontFamily: FONT, transition: 'color 0.3s ease' }}>{flag}</p>
+                <p style={{ margin: 0, color: '#7f1d1d', fontSize: '1rem', lineHeight: 1.65, fontFamily: FONT }}>{flag}</p>
               </div>
             ))
           }
