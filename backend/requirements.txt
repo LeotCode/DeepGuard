@@ -1,22 +1,18 @@
 # DeepGuard Backend — Python dependencies
-# Requires Python 3.9 – 3.11 (recommended: 3.11)
-# TensorFlow does NOT support Python 3.12+ yet.
 #
-# Install:
-#   pip install -r requirements.txt
+# ── Python version ─────────────────────────────────────────────────────────
+# Python 3.9, 3.10, or 3.11 ONLY.
+# TensorFlow has no wheels for Python 3.12+ on ANY platform.
+# Check your version: python --version
+# If wrong, recreate your venv:
+#   python3.11 -m venv .venv && source .venv/bin/activate
 #
-# ── OS-specific notes ──────────────────────────────────────────────────────
-# macOS Apple Silicon (M1/M2/M3):
-#   Works out of the box. TensorFlow installs the metal-enabled build.
-#
-# Windows:
-#   Install PyTorch with CUDA first if you have a GPU:
-#     https://pytorch.org/get-started/locally/
-#   Use opencv-python-headless (no GUI deps needed for a backend server).
-#
-# Linux:
-#   Same as Windows. For GPU support add tensorflow[and-cuda] separately.
-#   If running headless (no display), opencv-python-headless is correct.
+# ── Platform notes ─────────────────────────────────────────────────────────
+# macOS Apple Silicon (M1/M2/M3/M4): ✅ all packages have ARM wheels
+# macOS Intel:                        ✅ all packages supported
+# Windows x86-64:                     ✅ all packages supported
+# Linux x86-64:                       ✅ all packages supported
+# Linux ARM64 (Raspberry Pi etc):     ⚠️  no TF wheel — build from source
 
 # ── Web framework ──────────────────────────────────────────────────────────
 fastapi>=0.111.0
@@ -27,33 +23,33 @@ python-multipart>=0.0.9
 firebase-admin>=6.5.0
 
 # ── PyTorch ────────────────────────────────────────────────────────────────
-# CPU build works on all platforms. For GPU, install the CUDA build separately
-# from https://pytorch.org/get-started/locally/ before running pip install.
+# CPU build installs on all platforms automatically.
+# For GPU (CUDA), install manually first: https://pytorch.org/get-started/locally/
 torch>=2.2.0
 torchvision>=0.17.0
 
 # ── TensorFlow ─────────────────────────────────────────────────────────────
-# 2.15.x is the last version that ships keras as tensorflow.keras (Keras 2).
-# Capped at <2.16 to avoid the Keras 3 API breaking change.
-# Supports: macOS (x86 + ARM), Windows (x86), Linux (x86).
-# Note: tensorflow 2.15 has no official ARM Linux wheel — use tf-nightly on
-# Raspberry Pi / AWS Graviton, or build from source.
-tensorflow>=2.16.0,<2.17.0
+# 2.15.x = last version with tensorflow.keras (Keras 2 API).
+# 2.16+ switched to standalone Keras 3, breaking tf.keras.applications.*.
+# Wheels exist for: macOS ARM, macOS x86, Windows x86, Linux x86.
+# Python 3.9 / 3.10 / 3.11 only — no 3.12+ wheels exist for ANY TF version.
+tensorflow>=2.15.0,<2.16.0
+
+# tensorflow-hub: compatible with TF 2.15
 tensorflow-hub>=0.16.0
 
-# ── HDF5 weight loading ────────────────────────────────────────────────────
-# Used directly in model_runner.py to read layer weights from .keras zip files.
-# h5py 3.x is required by tensorflow 2.15 on all platforms.
+# ── HDF5 ───────────────────────────────────────────────────────────────────
+# Required for loading .h5 and .keras model weight files directly.
+# TF 2.15 uses h5py internally; we also use it directly in model_runner.py.
 h5py>=3.10.0,<4.0
 
 # ── Vision / image processing ──────────────────────────────────────────────
-# opencv-python-headless has no Qt/GTK GUI dependencies — correct for servers.
-# Works on macOS, Windows, and Linux without needing a display.
 Pillow>=10.0
+# headless = no Qt/GTK GUI deps; correct for server use on all platforms
 opencv-python-headless>=4.9.0
 
 # ── Numeric ────────────────────────────────────────────────────────────────
-# numpy <2.0 required — tensorflow 2.15 is not compatible with numpy 2.x.
+# numpy 2.x breaks TF 2.15 — must stay on 1.x
 numpy>=1.26,<2.0
 
 # ── Utilities ──────────────────────────────────────────────────────────────

@@ -88,12 +88,12 @@ class _EfficientNetImageModel(nn.Module):
 
 
 class _EfficientNetVideoModel(nn.Module):
-    """EfficientNet-B5 + LSTM for video sequences."""
+    """EfficientNet-B0 + LSTM for video sequences."""
 
     def __init__(self, num_vision_features: int = 5, dropout: float = 0.3,
                  lstm_hidden: int = 256, lstm_layers: int = 1):
         super().__init__()
-        backbone = models.efficientnet_b5(weights=None)
+        backbone = models.efficientnet_b0(weights=None)
         in_feats = backbone.classifier[1].in_features
         backbone.classifier = nn.Identity()
         self.backbone = backbone
@@ -146,28 +146,11 @@ def _load_effnet_image() -> _EfficientNetImageModel:
     if _effnet_img_model is None:
         m = _EfficientNetImageModel()
         if _EFFNET_IMG_PATH.exists():
-            try:
-                raw = torch.load(_EFFNET_IMG_PATH, map_location=_DEVICE)
-                m.load_state_dict(_remap_keys(raw), strict=False)
-                print(f"[DeepGuard] Loaded EfficientNet-B5 image weights: {_EFFNET_IMG_PATH}")
-            except Exception as e:
-                print(f"[DeepGuard] Failed to load checkpoint ({e}). Using pretrained B5 backbone.")
-                try:
-                    backbone = models.efficientnet_b5(weights='DEFAULT')
-                except TypeError:
-                    backbone = models.efficientnet_b5(pretrained=True)
-                in_feats = backbone.classifier[1].in_features
-                backbone.classifier = nn.Identity()
-                m.backbone = backbone
+            raw = torch.load(_EFFNET_IMG_PATH, map_location=_DEVICE)
+            m.load_state_dict(_remap_keys(raw), strict=False)
+            print(f"[DeepGuard] Loaded EfficientNet image weights: {_EFFNET_IMG_PATH}")
         else:
-            print(f"[DeepGuard] EfficientNet-B5 image: no weights at {_EFFNET_IMG_PATH}, using pretrained backbone.")
-            try:
-                backbone = models.efficientnet_b5(weights='DEFAULT')
-            except TypeError:
-                backbone = models.efficientnet_b5(pretrained=True)
-            in_feats = backbone.classifier[1].in_features
-            backbone.classifier = nn.Identity()
-            m.backbone = backbone
+            print(f"[DeepGuard] EfficientNet image: no weights at {_EFFNET_IMG_PATH}, using random init.")
         m.to(_DEVICE).eval()
         _effnet_img_model = m
     return _effnet_img_model
@@ -178,53 +161,64 @@ def _load_effnet_video() -> _EfficientNetVideoModel:
     if _effnet_vid_model is None:
         m = _EfficientNetVideoModel()
         if _EFFNET_VID_PATH.exists():
-            try:
-                raw = torch.load(_EFFNET_VID_PATH, map_location=_DEVICE)
-                m.load_state_dict(_remap_keys(raw), strict=False)
-                print(f"[DeepGuard] Loaded EfficientNet-B5 video weights: {_EFFNET_VID_PATH}")
-            except Exception as e:
-                print(f"[DeepGuard] Failed to load checkpoint ({e}). Using pretrained B5 backbone.")
-                try:
-                    backbone = models.efficientnet_b5(weights='DEFAULT')
-                except TypeError:
-                    backbone = models.efficientnet_b5(pretrained=True)
-                in_feats = backbone.classifier[1].in_features
-                backbone.classifier = nn.Identity()
-                m.backbone = backbone
+            raw = torch.load(_EFFNET_VID_PATH, map_location=_DEVICE)
+            m.load_state_dict(_remap_keys(raw), strict=False)
+            print(f"[DeepGuard] Loaded EfficientNet video weights: {_EFFNET_VID_PATH}")
         else:
-            print(f"[DeepGuard] EfficientNet-B5 video: no weights at {_EFFNET_VID_PATH}, using pretrained backbone.")
-            try:
-                backbone = models.efficientnet_b5(weights='DEFAULT')
-            except TypeError:
-                backbone = models.efficientnet_b5(pretrained=True)
-            in_feats = backbone.classifier[1].in_features
-            backbone.classifier = nn.Identity()
-            m.backbone = backbone
+            print(f"[DeepGuard] EfficientNet video: no weights at {_EFFNET_VID_PATH}, using random init.")
         m.to(_DEVICE).eval()
         _effnet_vid_model = m
     return _effnet_vid_model
 
 
 def _load_xception():
+    """
+    Load Xception deepfake classifier.
+
+    best_xception.h5 architecture (confirmed from file):
+        Xception (pooling=avg) -> Dense(512, relu) -> Dense(1, sigmoid)
+
+    .h5 = full Keras 2 saved model → use load_model() so the arch is read
+          directly from the file. No manual building needed.
+    .keras = weights-only → build arch manually then load by_name.
+    """
     global _xception_model
     if _xception_model is None:
         if _XCEPTION_PATH.exists():
-            # Build the architecture first, then load weights by_name
-            # This handles mismatches between Keras versions
-            base = Xception(weights=None, include_top=False, pooling="avg", input_shape=(299, 299, 3))
-            out  = tf.keras.layers.Dense(1, activation="sigmoid")(base.output)
-            _xception_model = tf.keras.Model(inputs=base.input, outputs=out)
-            try:
-                _xception_model.load_weights(str(_XCEPTION_PATH), by_name=True, skip_mismatch=True)
-                print(f"[DeepGuard] Loaded Xception weights: {_XCEPTION_PATH}")
-            except Exception as e:
-                print(f"[DeepGuard] Xception weight load warning (using random init): {e}")
+            suffix = _XCEPTION_PATH.suffix.lower()
+            if suffix == ".h5":
+                # Full saved model — architecture is embedded in the file
+                try:
+                    _xception_model = tf.keras.models.load_model(
+                        str(_XCEPTION_PATH), compile=False
+                    )
+                    print(f"[DeepGuard] Loaded Xception (.h5 full model): {_XCEPTION_PATH}")
+                    print(f"[DeepGuard] Xception output shape: {_xception_model.output_shape}")
+                except Exception as e:
+                    print(f"[DeepGuard] Xception .h5 load failed ({e}), using random init.")
+                    _xception_model = _build_xception_arch()
+            else:
+                # .keras weights file — build correct arch then load weights
+                _xception_model = _build_xception_arch()
+                try:
+                    _xception_model.load_weights(
+                        str(_XCEPTION_PATH), by_name=True, skip_mismatch=True
+                    )
+                    print(f"[DeepGuard] Loaded Xception (.keras weights): {_XCEPTION_PATH}")
+                except Exception as e:
+                    print(f"[DeepGuard] Xception weight load warning (using random init): {e}")
         else:
             print(f"[DeepGuard] Xception: no weights at {_XCEPTION_PATH}, using random init.")
-            base = Xception(weights=None, include_top=False, pooling="avg", input_shape=(299, 299, 3))
-            out  = tf.keras.layers.Dense(1, activation="sigmoid")(base.output)
-            _xception_model = tf.keras.Model(inputs=base.input, outputs=out)
+            _xception_model = _build_xception_arch()
     return _xception_model
+
+
+def _build_xception_arch():
+    """Build Xception arch matching best_xception.h5 training config."""
+    base = Xception(weights=None, include_top=False, pooling="avg", input_shape=(299, 299, 3))
+    x    = tf.keras.layers.Dense(512, activation="relu", name="dense")(base.output)
+    out  = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
+    return tf.keras.Model(inputs=base.input, outputs=out)
 
 
 def _load_resnet():
@@ -235,7 +229,8 @@ def _load_resnet():
             base = tf.keras.applications.ResNet50V2(
                 weights=None, include_top=False, pooling="avg", input_shape=(224, 224, 3)
             )
-            out  = tf.keras.layers.Dense(1, activation="sigmoid")(base.output)
+            x    = tf.keras.layers.Dense(256, activation="relu", name="dense")(base.output)
+            out  = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
             _resnet_model = tf.keras.Model(inputs=base.input, outputs=out)
             try:
                 _resnet_model.load_weights(str(_RESNET_PATH), by_name=True, skip_mismatch=True)
@@ -247,7 +242,8 @@ def _load_resnet():
             base = tf.keras.applications.ResNet50V2(
                 weights=None, include_top=False, pooling="avg", input_shape=(224, 224, 3)
             )
-            out  = tf.keras.layers.Dense(1, activation="sigmoid")(base.output)
+            x    = tf.keras.layers.Dense(256, activation="relu", name="dense")(base.output)
+            out  = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
             _resnet_model = tf.keras.Model(inputs=base.input, outputs=out)
     return _resnet_model
 
@@ -555,7 +551,7 @@ def run_video_pipeline(video_path: str, filename: str, num_frames: int = 10) -> 
         })
 
     flags = [
-        "Video sequence analysed using EfficientNet-B5 LSTM temporal model",
+        "Video sequence analysed using EfficientNet-B0 LSTM temporal model",
         *(["Temporal inconsistencies detected across frames"] if is_deepfake else []),
         *(["Frame-level scores remain consistently low — content appears authentic"] if not is_deepfake else []),
     ]
