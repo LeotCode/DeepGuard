@@ -9,7 +9,7 @@ to the raw JSON string (useful for Render / Railway / etc.).
 import os
 import json
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 import firebase_admin
 from firebase_admin import credentials, firestore, auth as firebase_auth

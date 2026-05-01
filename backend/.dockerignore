@@ -1,0 +1,6 @@
+__pycache__
+*.pyc
+.env
+secrets/
+tmp_test.jpg
+tmp_test.mp4
