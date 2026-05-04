@@ -80,7 +80,12 @@ export function ResultsProvider({ children }) {
 
   const addResult = (result) => {
     const id = result.scan_id || result.id
-    const normalised = { ...result, id }
+    const stableDate = result.date || (
+      result.scanned_at
+        ? new Date(result.scanned_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+        : new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+    )
+    const normalised = { ...result, id, date: stableDate }
 
     // Cache the media fields locally so they survive reload
     if (result.file_url || result.thumbnail || result.preview) {

@@ -1,18 +1,21 @@
-# DeepGuard Backend — Python dependencies
+# ══════════════════════════════════════════════════════════════════════════
+# DeepGuard Backend — Python Dependencies
+# Python 3.11 ONLY (TF has no wheels for 3.12+)
 #
-# ── Python version ─────────────────────────────────────────────────────────
-# Python 3.9, 3.10, or 3.11 ONLY.
-# TensorFlow has no wheels for Python 3.12+ on ANY platform.
-# Check your version: python --version
-# If wrong, recreate your venv:
-#   python3.11 -m venv .venv && source .venv/bin/activate
+# macOS Apple Silicon (M1/M2/M3/M4): ✅ supported
+# macOS Intel:                        ✅ supported
 #
-# ── Platform notes ─────────────────────────────────────────────────────────
-# macOS Apple Silicon (M1/M2/M3/M4): ✅ all packages have ARM wheels
-# macOS Intel:                        ✅ all packages supported
-# Windows x86-64:                     ✅ all packages supported
-# Linux x86-64:                       ✅ all packages supported
-# Linux ARM64 (Raspberry Pi etc):     ⚠️  no TF wheel — build from source
+# Fresh venv setup (macOS):
+#   deactivate
+#   rm -rf .venv
+#   python3.11 -m venv .venv
+#   source .venv/bin/activate
+#   pip install --upgrade pip
+#   pip install -r requirements.txt
+# ══════════════════════════════════════════════════════════════════════════
+
+# ── Typing fix — must come first to resolve TF vs FastAPI conflict ─────────
+typing-extensions>=4.8.0
 
 # ── Web framework ──────────────────────────────────────────────────────────
 fastapi>=0.111.0
@@ -23,34 +26,32 @@ python-multipart>=0.0.9
 firebase-admin>=6.5.0
 
 # ── PyTorch ────────────────────────────────────────────────────────────────
-# CPU build installs on all platforms automatically.
-# For GPU (CUDA), install manually first: https://pytorch.org/get-started/locally/
 torch>=2.2.0
 torchvision>=0.17.0
 
 # ── TensorFlow ─────────────────────────────────────────────────────────────
-# 2.15.x = last version with tensorflow.keras (Keras 2 API).
-# 2.16+ switched to standalone Keras 3, breaking tf.keras.applications.*.
-# Wheels exist for: macOS ARM, macOS x86, Windows x86, Linux x86.
-# Python 3.9 / 3.10 / 3.11 only — no 3.12+ wheels exist for ANY TF version.
+# 2.15.x is the last version with the tensorflow.keras API.
+# Use --ignore-requires-python if pip complains about typing-extensions.
 tensorflow>=2.15.0,<2.16.0
 
-# tensorflow-hub: compatible with TF 2.15
-tensorflow-hub>=0.16.0
-
 # ── HDF5 ───────────────────────────────────────────────────────────────────
-# Required for loading .h5 and .keras model weight files directly.
-# TF 2.15 uses h5py internally; we also use it directly in model_runner.py.
 h5py>=3.10.0,<4.0
 
 # ── Vision / image processing ──────────────────────────────────────────────
 Pillow>=10.0
-# headless = no Qt/GTK GUI deps; correct for server use on all platforms
 opencv-python-headless>=4.9.0
 
+# ── Audio processing ───────────────────────────────────────────────────────
+librosa>=0.10.0
+soundfile>=0.12.0
+
 # ── Numeric ────────────────────────────────────────────────────────────────
-# numpy 2.x breaks TF 2.15 — must stay on 1.x
-numpy>=1.26,<2.0
+numpy>=1.24,<2.0
+
+# ── LLM — AI analysis summaries (free, no credit card needed) ─────────────
+# Get your free key at https://console.groq.com/
+# Add GROQ_API_KEY=your_key to your .env file
+groq>=0.11.0
 
 # ── Utilities ──────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0

@@ -122,12 +122,17 @@ export default function Home() {
       // For video/audio: store blob URL in sessionStorage so the result page
       // can retrieve it without needing localStorage (which can't hold large blobs).
       // sessionStorage survives navigation within the same tab.
+      // Re-create a fresh blob URL from the original File object and store it.
+      // Blob URLs die on navigation — sessionStorage keeps them alive within the tab.
       let resultFileUrl = preview
-      if (selectedFile && (selectedFile.type.startsWith('video/') || selectedFile.type.startsWith('audio/'))) {
-        // Re-create a fresh blob URL from the original File object
+      if (selectedFile) {
         const freshBlobUrl = URL.createObjectURL(selectedFile)
-        try { sessionStorage.setItem(`deepguard_video_${id}`, freshBlobUrl) } catch (_) {}
         resultFileUrl = freshBlobUrl
+        if (selectedFile.type.startsWith('video/') || selectedFile.type.startsWith('audio/')) {
+          try { sessionStorage.setItem(`deepguard_video_${id}`, freshBlobUrl) } catch (_) {}
+        }
+        // Store for ALL media types including images
+        try { sessionStorage.setItem(`deepguard_media_${id}`, freshBlobUrl) } catch (_) {}
       }
 
       addResult({
@@ -149,7 +154,8 @@ export default function Home() {
         file_type: data.file_type || 'image',
         is_deepfake: data.is_deepfake,
         frames_analyzed: data.frames_analyzed,
-        date: new Date().toLocaleDateString(),
+        created_at: data.created_at || new Date().toISOString(),
+        date: data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : new Date().toLocaleDateString(),
       })
 
       setScanDone(true)
