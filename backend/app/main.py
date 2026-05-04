@@ -13,13 +13,14 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.firebase_client import db, verify_token
+from typing import Optional
 from app.schemas import ScanResult, ScanHistoryItem
-from app.model_runner import run_image_pipeline, run_video_pipeline
+from app.model_runner import run_image_pipeline, run_video_pipeline, run_audio_pipeline
 
 # ──────────────────────────────────────────────
 # App setup
@@ -60,8 +61,24 @@ app.add_middleware(
 )
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
-ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm"}
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
+ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/aac", "audio/ogg", "audio/flac"}
 MAX_FILE_SIZE_MB = 100
+
+
+async def verify_token_optional(authorization: Optional[str] = Header(None)) -> Optional[dict]:
+    """Like verify_token but returns None for guests instead of raising 401."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None  # guest — no token
+    try:
+        from app.firebase_client import verify_token as _vt
+        # Temporarily wrap the strict verify_token
+        import firebase_admin.auth as _fa
+        token = authorization.split(" ", 1)[1]
+        decoded = _fa.verify_id_token(token)
+        return decoded
+    except Exception:
+        return None  # invalid token → treat as guest
 
 
 # ──────────────────────────────────────────────
@@ -78,7 +95,7 @@ def health():
 @app.post("/scan", response_model=ScanResult)
 async def scan_file(
     file: UploadFile = File(...),
-    token_data: dict = Depends(verify_token),
+    token_data: Optional[dict] = Depends(verify_token_optional),
 ):
     """
     Accepts an image or video upload.
@@ -91,18 +108,19 @@ async def scan_file(
     The result is saved to Firestore under the authenticated user's collection
     and returned as JSON.
     """
-    user_id = token_data["uid"]
+    user_id = token_data["uid"] if token_data else None
 
     # ── validate mime type ──────────────────────────────────────────────────
     content_type = file.content_type or mimetypes.guess_type(file.filename)[0] or ""
     is_image = content_type in ALLOWED_IMAGE_TYPES
     is_video = content_type in ALLOWED_VIDEO_TYPES
+    is_audio = content_type in ALLOWED_AUDIO_TYPES
 
-    if not is_image and not is_video:
+    if not is_image and not is_video and not is_audio:
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported file type: {content_type}. "
-                   f"Allowed: JPEG, PNG, WEBP, MP4, MOV, AVI, WEBM.",
+                   f"Allowed: JPEG, PNG, WEBP, MP4, MOV, AVI, WEBM, MP3, WAV, AAC.",
         )
 
     # ── read & size-check ───────────────────────────────────────────────────
@@ -124,6 +142,8 @@ async def scan_file(
         # ── run the appropriate pipeline ────────────────────────────────────
         if is_image:
             result_data = run_image_pipeline(tmp_path, file.filename)
+        elif is_audio:
+            result_data = run_audio_pipeline(tmp_path, file.filename)
         else:
             result_data = run_video_pipeline(tmp_path, file.filename)
 
@@ -138,9 +158,10 @@ async def scan_file(
             **result_data,
         }
 
-        # ── persist to Firestore ─────────────────────────────────────────────
-        db.collection("users").document(user_id) \
-          .collection("scans").document(scan_id).set(record)
+        # ── persist to Firestore (logged-in users only) ──────────────────────
+        if user_id:
+            db.collection("users").document(user_id) \
+              .collection("scans").document(scan_id).set(record)
 
         return JSONResponse(content=record)
 

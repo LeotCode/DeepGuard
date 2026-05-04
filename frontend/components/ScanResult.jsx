@@ -29,14 +29,20 @@ function RiskIcon({ score, size = 20 }) {
 
 function Card({ children, style = {} }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   return <div style={{ backgroundColor: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '20px', overflow: 'hidden', marginBottom: '1.5rem', boxShadow: theme.boxShadow, fontFamily: FONT, transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease', ...style }}>{children}</div>
 }
 function CardHeader({ children }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   return <div style={{ padding: '1.35rem 1.8rem', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'border-color 0.3s ease' }}>{children}</div>
 }
 function CardTitle({ children }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   return <p style={{ margin: 0, fontWeight: '700', fontSize: '1.15rem', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>{children}</p>
 }
 function CardBody({ children }) {
@@ -45,6 +51,8 @@ function CardBody({ children }) {
 
 function ScoreDisplay({ result }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const cfg = getRiskConfig(result.ai_score)
   const [animScore, setAnimScore] = useState(0)
   const circumference = 2 * Math.PI * 88
@@ -88,15 +96,7 @@ function ScoreDisplay({ result }) {
               <p style={{ margin: 0, color: theme.muted, lineHeight: 1.7, fontSize: '1.02rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>{cfg.description}</p>
             </div>
 
-            <div style={{ backgroundColor: cfg.badgeBg, border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '1.2rem', transition: 'border-color 0.3s ease' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                <span style={{ fontSize: '0.9rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>Confidence Level</span>
-                <span style={{ fontSize: '1.12rem', fontWeight: '700', color: cfg.scoreColor, fontFamily: FONT }}>{result.confidence != null ? `${Number(result.confidence).toFixed(1)}%` : '—'}%</span>
-              </div>
-              <div style={{ height: '8px', backgroundColor: theme.border, borderRadius: '99px', overflow: 'hidden', transition: 'background-color 0.3s ease' }}>
-                <div style={{ height: '100%', width: `${result.confidence ?? 0}%`, backgroundColor: cfg.scoreColor, borderRadius: '99px', transition: 'width 1s ease' }} />
-              </div>
-            </div>
+
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
               {[{ label: 'Media Type', value: result.file_type || 'Image', color: theme.text }, { label: 'Analysis Status', value: 'Complete', color: '#22c55e' }].map(({ label, value, color }) => (
@@ -115,6 +115,8 @@ function ScoreDisplay({ result }) {
 
 function TimelineGraph({ data }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
   const avg  = (data.reduce((s, d) => s + d.ai_likelihood, 0) / data.length).toFixed(1)
   const peak = Math.max(...data.map(d => d.ai_likelihood)).toFixed(1)
@@ -153,9 +155,25 @@ function TimelineGraph({ data }) {
   )
 }
 
-function HeatmapDisplay({ fileUrl, fileType, regions }) {
+function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const [show, setShow] = useState(true)
+  const [liveUrl, setLiveUrl] = useState(fileUrl)
+
+  useEffect(() => {
+    if (!scanId) { setLiveUrl(fileUrl); return }
+    if (fileType === 'video' || fileType === 'audio') {
+      const stored = sessionStorage.getItem(`deepguard_video_${scanId}`)
+      setLiveUrl(stored || fileUrl)
+    } else {
+      // Images: try sessionStorage first (blob URL survives navigation)
+      const stored = sessionStorage.getItem(`deepguard_media_${scanId}`)
+      setLiveUrl(stored || fileUrl)
+    }
+  }, [fileUrl, fileType, scanId])
+
   const isImage = !fileType || fileType === 'image'
   const getColor = (i) => i >= 0.7 ? { fill: 'rgba(239,68,68,0.3)', stroke: '#ef4444' } : i >= 0.4 ? { fill: 'rgba(245,158,11,0.3)', stroke: '#f59e0b' } : { fill: 'rgba(34,197,94,0.3)', stroke: '#22c55e' }
 
@@ -177,14 +195,14 @@ function HeatmapDisplay({ fileUrl, fileType, regions }) {
       <CardBody>
         {/* Media area */}
         <div style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', backgroundColor: '#000', border: `1px solid ${theme.border}`, transition: 'border-color 0.3s ease' }}>
-          {fileUrl ? (
+          {liveUrl ? (
             fileType === 'video' ? (
               // Use a wrapper div with intrinsic aspect ratio so portrait (9:16)
               // and landscape (16:9) videos both display correctly without black bars.
               // The video fills the wrapper; the browser picks the right height from metadata.
               <div style={{ position: 'relative', width: '100%' }}>
                 <video
-                  src={fileUrl}
+                  src={liveUrl}
                   controls
                   style={{
                     display: 'block',
@@ -201,12 +219,12 @@ function HeatmapDisplay({ fileUrl, fileType, regions }) {
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
                 </svg>
-                <audio src={fileUrl} controls style={{ width: '100%', maxWidth: '420px' }} />
+                <audio src={liveUrl} controls style={{ width: '100%', maxWidth: '420px' }} />
               </div>
             ) : (
               // Image with heatmap overlay
               <div style={{ position: 'relative' }}>
-                <img src={fileUrl} alt="Analysis" style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', display: 'block' }} />
+                <img src={liveUrl} alt="Analysis" style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'contain', display: 'block', borderRadius: '8px' }} />
                 {show && regions.length > 0 && (
                   <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
                     {regions.map((r, i) => { const c = getColor(r.intensity); return <rect key={i} x={`${r.x}%`} y={`${r.y}%`} width={`${r.width}%`} height={`${r.height}%`} fill={c.fill} stroke={c.stroke} strokeWidth="2" /> })}
@@ -250,6 +268,8 @@ function HeatmapDisplay({ fileUrl, fileType, regions }) {
 
 function RedFlagsList({ flags }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   return (
     <Card>
       <CardHeader>
@@ -277,6 +297,8 @@ function RedFlagsList({ flags }) {
 
 function AnalysisSummary({ summary }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   return (
     <Card>
       <CardHeader><CardTitle>Analysis Summary</CardTitle></CardHeader>
@@ -287,12 +309,14 @@ function AnalysisSummary({ summary }) {
 
 function FileDetails({ result }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   return (
     <Card>
       <CardHeader><CardTitle>File Details</CardTitle></CardHeader>
       <CardBody>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {[{ label: 'Type', value: result.file_type || 'Image' }, { label: 'Confidence', value: result.confidence != null ? `${Number(result.confidence).toFixed(1)}%` : '—' }, { label: 'Faces Detected', value: result.total_faces }].map(({ label, value }) => (
+          {[{ label: 'Type', value: result.file_type || 'Image' }, { label: 'Faces Detected', value: result.total_faces }].map(({ label, value }) => (
             <div key={label}>
               <p style={{ margin: '0 0 3px', fontSize: '0.82rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>{label}</p>
               <p style={{ margin: 0, fontWeight: '700', color: theme.text, textTransform: 'capitalize', fontSize: '1.04rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>{value}</p>
@@ -311,6 +335,8 @@ function FileDetails({ result }) {
 
 export default function ScanResult({ result }) {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const cfg = getRiskConfig(result.ai_score ?? 0)
 
   if (result.error) {
@@ -323,7 +349,14 @@ export default function ScanResult({ result }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.8rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ margin: '0 0 6px', fontSize: '2rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>{result.file_name || 'Scan Result'}</h1>
-          <p style={{ margin: 0, color: theme.muted, fontSize: '0.96rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>Analyzed on {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+          <p style={{ margin: 0, color: theme.muted, fontSize: '0.96rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>
+            Analyzed on {mounted ? (() => {
+              const ts = result.created_at || result.scanned_at
+              if (!ts) return result.date || 'Unknown date'
+              try { return new Date(ts).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+              catch { return result.date || ts }
+            })() : (result.date || '...')}
+          </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: cfg.badgeBg, border: `1px solid ${cfg.badgeColor}44`, borderRadius: '99px', padding: '0.55rem 1.15rem', color: cfg.badgeColor, fontSize: '0.94rem', fontWeight: '700', fontFamily: FONT }}>
           <RiskIcon score={result.ai_score} size={17} />{cfg.label}
@@ -340,6 +373,7 @@ export default function ScanResult({ result }) {
               fileUrl={result.file_url}
               fileType={result.file_type}
               regions={result.heatmap_regions || []}
+              scanId={result.id || result.scan_id}
             />
           )}
         </div>
