@@ -6,7 +6,7 @@ Video  → EfficientNet-LSTM pipeline → single deepfake score
 
 Model weights are loaded from the paths set in environment variables:
     EFFICIENTNET_IMAGE_MODEL_PATH   (default: models/efficientnet_image.pth)
-    XCEPTION_MODEL_PATH             (default: models/xception_model.h5)
+    XCEPTION_MODEL_PATH             (default: models/best_xception_weights.h5)
     RESNET_MODEL_PATH               (default: models/resnet_model.keras)
     EFFICIENTNET_VIDEO_MODEL_PATH   (default: models/efficientnet_video.pth)
 
@@ -22,10 +22,12 @@ import librosa
 import librosa.feature
 from groq import Groq as _GroqClient
 from dotenv import load_dotenv
-load_dotenv()
 import math
 from pathlib import Path
 from typing import Optional
+
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_BACKEND_ROOT / ".env")
 
 import cv2
 import numpy as np
@@ -51,12 +53,31 @@ with warnings.catch_warnings():
     )
 
 # ── paths ──────────────────────────────────────────────────────────────────
-_BASE = Path(__file__).parent.parent / "models"
-_EFFNET_IMG_PATH  = Path(os.environ.get("EFFICIENTNET_IMAGE_MODEL_PATH",  str(_BASE / "image_model.pth")))
-_XCEPTION_PATH    = Path(os.environ.get("XCEPTION_MODEL_PATH",            str(_BASE / "best_xception.h5")))
-_RESNET_PATH      = Path(os.environ.get("RESNET_MODEL_PATH",              str(_BASE / "best_model.keras")))
-_AUDIO_PATH       = Path(os.environ.get("AUDIO_MODEL_PATH",             str(_BASE / "audio_model.pth")))
-_EFFNET_VID_PATH  = Path(os.environ.get("EFFICIENTNET_VIDEO_MODEL_PATH",  str(_BASE / "video_model.pth")))
+_BASE = _BACKEND_ROOT / "models"
+
+
+def _model_path(env_name: str, default_filename: str) -> Path:
+    configured = os.environ.get(env_name)
+    if not configured:
+        return _BASE / default_filename
+
+    path = Path(configured).expanduser()
+    candidates = [path]
+    if not path.is_absolute():
+        candidates.extend((_BACKEND_ROOT / path, _BASE / path.name))
+    candidates.append(_BASE / default_filename)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+_EFFNET_IMG_PATH  = _model_path("EFFICIENTNET_IMAGE_MODEL_PATH", "image_model.pth")
+_XCEPTION_PATH    = _model_path("XCEPTION_MODEL_PATH",           "best_xception_weights.h5")
+_RESNET_PATH      = _model_path("RESNET_MODEL_PATH",             "best_model.keras")
+_AUDIO_PATH       = _model_path("AUDIO_MODEL_PATH",              "audio_model.pth")
+_EFFNET_VID_PATH  = _model_path("EFFICIENTNET_VIDEO_MODEL_PATH", "video_model.pth")
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -211,21 +232,23 @@ def _load_effnet_video() -> _EfficientNetVideoModel:
 
 def _load_xception():
     """
-    Load best_xception.h5 (Keras 2.13.1 format).
+    Load best_xception_weights.h5 (Keras weights format).
 
-    Root cause of 1.0 output: weight_names attribute in the h5 group contains
-    Adam optimizer moments as duplicates (each weight appears 3x: real, m, v).
-    Our h5py loader was loading optimizer moments into the model weights,
-    corrupting the Dense output layer with wrong arrays.
-
-    Fix: deduplicate weight_names keeping only FIRST occurrence of each weight
-    type (kernel, bias, gamma, beta, moving_mean, moving_variance).
     """
     global _xception_model
     if _xception_model is None:
         model = _build_xception_arch()
 
         if _XCEPTION_PATH.exists():
+            print(f"[DeepGuard] Loading Xception weights from: {_XCEPTION_PATH}")
+            try:
+                model.load_weights(str(_XCEPTION_PATH))
+                print(f"[DeepGuard] Loaded Xception weights: {_XCEPTION_PATH}")
+                _xception_model = model
+                return _xception_model
+            except Exception as direct_error:
+                print(f"[DeepGuard] Xception direct weight load warning: {direct_error}")
+
             try:
                 import h5py
 
@@ -271,7 +294,7 @@ def _load_xception():
                 loaded_dense = 0
 
                 with h5py.File(str(_XCEPTION_PATH), "r") as f:
-                    mw = f["model_weights"]
+                    mw = f["model_weights"] if "model_weights" in f else f
 
                     # Base Xception layers stored under model_weights/xception/
                     if "xception" in mw:
@@ -313,11 +336,42 @@ def _load_xception():
 
 
 def _build_xception_arch():
-    """Build Xception arch matching best_xception.h5 training config."""
-    base = Xception(weights=None, include_top=False, pooling="avg", input_shape=(299, 299, 3))
-    x    = tf.keras.layers.Dense(512, activation="relu", name="dense")(base.output)
-    out  = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
-    return tf.keras.Model(inputs=base.input, outputs=out)
+    """Build Xception architecture matching the training code."""
+    try:
+        base_model = Xception(
+            weights="imagenet",
+            include_top=False,
+            input_shape=(299, 299, 3),
+        )
+    except Exception as e:
+        print(f"[DeepGuard] Xception ImageNet base load warning: {e}. Using weights=None.")
+        base_model = Xception(
+            weights=None,
+            include_top=False,
+            input_shape=(299, 299, 3),
+        )
+
+    base_model.trainable = False
+
+    inputs = tf.keras.Input(shape=(299, 299, 3))
+    x = base_model(inputs, training=False)
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = tf.keras.layers.Dense(512, activation="relu")(x)
+    x = tf.keras.layers.Dropout(0.4)(x)
+    outputs = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+
+    model = tf.keras.Model(inputs, outputs)
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+        loss="binary_crossentropy",
+        metrics=[
+            "accuracy",
+            tf.keras.metrics.AUC(name="auc"),
+            tf.keras.metrics.Precision(name="precision"),
+            tf.keras.metrics.Recall(name="recall"),
+        ],
+    )
+    return model
 
 
 def _load_resnet():
@@ -468,10 +522,7 @@ def _resnet_score(img: Image.Image) -> float:
 
 def _ensemble_score(img: Image.Image, feature_vec: np.ndarray) -> dict:
     """
-    Two-model ensemble: EfficientNet-B5 (60%) + ResNet50V2 (40%).
-    Xception is excluded — the saved model outputs a constant saturated value
-    (1.0) for all inputs regardless of content, meaning it learned a degenerate
-    solution during training. It needs to be retrained to be useful.
+    Three-model ensemble: EfficientNet-B5 + Xception + ResNet50V2.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -483,12 +534,20 @@ def _ensemble_score(img: Image.Image, feature_vec: np.ndarray) -> dict:
     def run_resnet():
         return ("resnet", _resnet_score(img))
 
+    def run_xception():
+        return ("xception", _xception_score(img))
+
     # Pre-load models before threading to avoid race conditions
     _load_effnet_image()
+    _load_xception()
     _load_resnet()
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(run_effnet), executor.submit(run_resnet)]
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [
+            executor.submit(run_effnet),
+            executor.submit(run_xception),
+            executor.submit(run_resnet),
+        ]
         for future in as_completed(futures):
             try:
                 name, score = future.result()
@@ -498,14 +557,14 @@ def _ensemble_score(img: Image.Image, feature_vec: np.ndarray) -> dict:
                 import traceback; traceback.print_exc()
 
     s_eff = results.get("efficientnet", 0.5)
+    s_xcp = results.get("xception",     0.5)
     s_res = results.get("resnet",       0.5)
 
-    # EfficientNet-B5: 60%, ResNet50V2: 40%
-    weighted = 0.60 * s_eff + 0.40 * s_res
+    weighted = (s_eff + s_xcp + s_res) / 3.0
 
     return {
         "efficientnet": round(s_eff    * 100, 2),
-        "xception":     None,
+        "xception":     round(s_xcp    * 100, 2),
         "resnet":       round(s_res    * 100, 2),
         "average":      round(weighted * 100, 2),
     }
@@ -609,10 +668,11 @@ def _generate_summary(
             # Build model context so the LLM understands what each model does
             if file_type == "image":
                 model_context = (
-                    "EfficientNet-B5 (60% weight): CNN trained on full images, fused with OpenCV "
+                    "EfficientNet-B5: CNN trained on full images, fused with OpenCV "
                     "visual features (sharpness, edge density, colour variance). "
-                    "ResNet50V2 (40% weight): residual CNN trained on 140k real/fake face images. "
-                    "Final score: weighted average of both models."
+                    "Xception: ImageNet-initialised CNN fine-tuned for image deepfake detection. "
+                    "ResNet50V2: residual CNN trained on real/fake images. "
+                    "Final score: average of the three image models."
                 )
             elif file_type == "video":
                 model_context = (
@@ -985,11 +1045,13 @@ def run_image_pipeline(image_path: str, filename: str) -> dict:
 
     model_scores_list = [
         {"model": "efficientnet_b5", "score": scores["efficientnet"]},
+        {"model": "xception",        "score": scores["xception"]},
         {"model": "resnet50v2",      "score": scores["resnet"]},
     ]
 
     img_model_scores = {
         "EfficientNet-B5": scores["efficientnet"],
+        "Xception":        scores["xception"],
         "ResNet50V2":      scores["resnet"],
     }
     flags   = _generate_red_flags(feature_vec, ai_score, model_scores=img_model_scores)
