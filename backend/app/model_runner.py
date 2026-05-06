@@ -75,7 +75,7 @@ def _model_path(env_name: str, default_filename: str) -> Path:
 
 _EFFNET_IMG_PATH  = _model_path("EFFICIENTNET_IMAGE_MODEL_PATH", "image_model.pth")
 _XCEPTION_PATH    = _model_path("XCEPTION_MODEL_PATH",           "best_xception_weights.h5")
-_RESNET_PATH      = _model_path("RESNET_MODEL_PATH",             "best_model.keras")
+_RESNET_PATH      = _model_path("RESNET_MODEL_PATH",             "best_model_acc.keras")
 _AUDIO_PATH       = _model_path("AUDIO_MODEL_PATH",              "audio_model.pth")
 _EFFNET_VID_PATH  = _model_path("EFFICIENTNET_VIDEO_MODEL_PATH", "video_model.pth")
 
@@ -118,15 +118,22 @@ class _EfficientNetImageModel(nn.Module):
 
 
 class _EfficientNetVideoModel(nn.Module):
-    """EfficientNet-B0 + LSTM for video sequences."""
+    """
+    EfficientNet-B0 + LSTM for video sequences.
+    Checkpoint keys confirmed from video_model.pth:
+      efficientnet.features.* — backbone (stored as 'efficientnet', NOT 'backbone')
+      efficientnet.avgpool
+      lstm.weight_ih_l0, lstm.weight_hh_l0, lstm.bias_ih_l0, lstm.bias_hh_l0
+      classifier.0/3.weight/bias — Linear(256,128) and Linear(128,1)
+    """
 
     def __init__(self, num_vision_features: int = 5, dropout: float = 0.3,
                  lstm_hidden: int = 256, lstm_layers: int = 1):
         super().__init__()
-        backbone = models.efficientnet_b0(weights=None)
-        in_feats = backbone.classifier[1].in_features
-        backbone.classifier = nn.Identity()
-        self.backbone = backbone
+        # Must be named 'efficientnet' to match checkpoint keys
+        self.efficientnet = models.efficientnet_b0(weights=None)
+        in_feats = self.efficientnet.classifier[1].in_features  # 1280
+        self.efficientnet.classifier = nn.Identity()
 
         self.lstm = nn.LSTM(
             input_size=in_feats + num_vision_features,
@@ -135,17 +142,17 @@ class _EfficientNetVideoModel(nn.Module):
             batch_first=True,
         )
         self.classifier = nn.Sequential(
-            nn.Linear(lstm_hidden, 128),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(128, 1),
-            nn.Sigmoid(),
+            nn.Linear(lstm_hidden, 128),  # classifier.0
+            nn.ReLU(),                     # classifier.1
+            nn.Dropout(dropout),           # classifier.2
+            nn.Linear(128, 1),             # classifier.3
+            nn.Sigmoid(),                  # classifier.4
         )
 
     def forward(self, img_seq: torch.Tensor, vision_seq: torch.Tensor) -> torch.Tensor:
         b, s, c, h, w = img_seq.shape
         x = img_seq.view(b * s, c, h, w)
-        feats = self.backbone(x).view(b, s, -1)
+        feats = self.efficientnet(x).view(b, s, -1)
         combined = torch.cat([feats, vision_seq], dim=2)
         _, (hn, _) = self.lstm(combined)
         return self.classifier(hn[-1])
@@ -216,32 +223,37 @@ def _load_effnet_image() -> _EfficientNetImageModel:
 
 
 def _load_effnet_video() -> _EfficientNetVideoModel:
+    """
+    Load EfficientNet-B0 LSTM video model.
+    Checkpoint uses 'efficientnet.*' keys — model class already matches.
+    """
     global _effnet_vid_model
     if _effnet_vid_model is None:
         m = _EfficientNetVideoModel()
         if _EFFNET_VID_PATH.exists():
             try:
-                raw = torch.load(_EFFNET_VID_PATH, map_location=_DEVICE)
-                m.load_state_dict(_remap_keys(raw), strict=False)
-                print(f"[DeepGuard] Loaded EfficientNet-B5 video weights: {_EFFNET_VID_PATH}")
+                state = torch.load(_EFFNET_VID_PATH, map_location=_DEVICE, weights_only=False)
+                missing, unexpected = m.load_state_dict(state, strict=False)
+                loaded = len(state) - len(missing)
+                print(f"[DeepGuard] Video model: loaded {loaded}/{len(state)} keys — missing={len(missing)} unexpected={len(unexpected)}")
+                if missing:
+                    print(f"[DeepGuard]   missing sample: {list(missing)[:3]}")
+                # Sanity check — zeros vs random should differ
+                test_zeros = torch.zeros(1, 5, 3, 224, 224).to(_DEVICE)
+                test_rand  = torch.rand(1, 5, 3, 224, 224).to(_DEVICE)
+                fvec       = torch.zeros(1, 5, 5).to(_DEVICE)
+                with torch.no_grad():
+                    t1 = float(m(test_zeros, fvec).item())
+                    t2 = float(m(test_rand,  fvec).item())
+                print(f"[DeepGuard] Video sanity — zeros: {t1:.4f}, random: {t2:.4f}")
+                if abs(t1 - t2) < 0.005:
+                    print("[DeepGuard] WARNING: Video model outputs identical — weights may not have loaded")
             except Exception as e:
-                print(f"[DeepGuard] Failed to load checkpoint ({e}). Using pretrained B0 backbone.")
-                try:
-                    backbone = models.efficientnet_b0(weights='DEFAULT')
-                except TypeError:
-                    backbone = models.efficientnet_b0(pretrained=True)
-                in_feats = backbone.classifier[1].in_features
-                backbone.classifier = nn.Identity()
-                m.backbone = backbone
+                import traceback
+                print(f"[DeepGuard] Video model load FAILED: {e}")
+                traceback.print_exc()
         else:
-            print(f"[DeepGuard] EfficientNet-B0 video: no weights at {_EFFNET_VID_PATH}, using pretrained backbone.")
-            try:
-                backbone = models.efficientnet_b0(weights='DEFAULT')
-            except TypeError:
-                backbone = models.efficientnet_b0(pretrained=True)
-            in_feats = backbone.classifier[1].in_features
-            backbone.classifier = nn.Identity()
-            m.backbone = backbone
+            print(f"[DeepGuard] Video model not found at {_EFFNET_VID_PATH}")
         m.to(_DEVICE).eval()
         _effnet_vid_model = m
     return _effnet_vid_model
@@ -589,13 +601,12 @@ def _ensemble_score(img: Image.Image, feature_vec: np.ndarray) -> dict:
     s_xc  = results.get("xception",     0.5)
     s_res = results.get("resnet",        0.5)
 
-    # Xception excluded from weighted average — degenerate model (~79% for all inputs)
-    # would push real images above the 50% fake threshold
-    weighted = (s_eff + s_res) / 2.0
+    # Equal 33% weight for each model
+    weighted = (s_eff + s_xc + s_res) / 3.0
 
     return {
         "efficientnet": round(s_eff * 100, 2),
-        "xception":     round(s_xc  * 100, 2),   # shown for info only
+        "xception":     round(s_xc  * 100, 2),
         "resnet":       round(s_res  * 100, 2),
         "average":      round(weighted * 100, 2),
     }
@@ -615,21 +626,24 @@ def _generate_red_flags(
     flags = []
     _, _, blur, color, edge = feature_vec
 
-    # ── CV feature flags (from real OpenCV measurements) ──
-    if blur < 0.15:
-        flags.append("Very low image sharpness — heavy blurring around facial features, typical of GAN face synthesis")
-    elif blur < 0.35:
-        flags.append("Below-average image sharpness — moderate blurring around edges, common in synthesised faces")
+    # ── CV feature flags — only meaningful when score suggests AI (>50) ──
+    # Low-quality real photos can have similar blur/edge values to AI images
+    # so we only flag these when the models also suspect manipulation
+    if ai_score > 50:
+        if blur < 0.15:
+            flags.append("Very low image sharpness — heavy blurring around facial features, typical of GAN face synthesis")
+        elif blur < 0.35:
+            flags.append("Below-average image sharpness — moderate blurring around edges, common in synthesised faces")
 
-    if color < 0.15:
-        flags.append("Extremely uniform skin tone — near-zero colour variance, characteristic of GAN-generated faces")
-    elif color < 0.30:
-        flags.append("Low colour diversity — unnaturally uniform skin tone detected")
+        if color < 0.15:
+            flags.append("Extremely uniform skin tone — near-zero colour variance, characteristic of GAN-generated faces")
+        elif color < 0.30:
+            flags.append("Low colour diversity — unnaturally uniform skin tone detected")
 
-    if edge < 0.03:
-        flags.append("Very sparse edge detail — smooth boundaries typical of neural face synthesis (GAN smoothing)")
-    elif edge < 0.07:
-        flags.append("Reduced edge density — softer boundaries than expected for a real photograph")
+        if edge < 0.03:
+            flags.append("Very sparse edge detail — smooth boundaries typical of neural face synthesis (GAN smoothing)")
+        elif edge < 0.07:
+            flags.append("Reduced edge density — softer boundaries than expected for a real photograph")
 
     # ── Model agreement flags ──
     if model_scores:
@@ -637,11 +651,11 @@ def _generate_red_flags(
         if len(scores) >= 2:
             spread = max(scores) - min(scores)
             if spread > 40:
-                flags.append(
-                    f"High model disagreement ({spread:.0f}% spread) — "
-                    "models detected inconsistent signals, suggesting partial manipulation"
-                )
-            elif spread > 20:
+                if ai_score > 50:
+                    flags.append(f"High model disagreement ({spread:.0f}% spread) — models detected inconsistent signals, suggesting partial manipulation")
+                else:
+                    flags.append(f"High model disagreement ({spread:.0f}% spread) — one model flagged concerns but overall score suggests authentic content")
+            elif spread > 20 and ai_score > 50:
                 flags.append(f"Moderate model disagreement ({spread:.0f}% spread) — some inconsistency between detection models")
 
         # Flag when all models agree strongly

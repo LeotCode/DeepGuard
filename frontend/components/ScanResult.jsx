@@ -168,7 +168,7 @@ function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
       const stored = sessionStorage.getItem(`deepguard_video_${scanId}`)
       setLiveUrl(stored || fileUrl)
     } else {
-      // Images: try sessionStorage first (blob URL survives navigation)
+      // Images: sessionStorage blob URL survives navigation, direct blob URL does not
       const stored = sessionStorage.getItem(`deepguard_media_${scanId}`)
       setLiveUrl(stored || fileUrl)
     }
@@ -223,8 +223,7 @@ function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
               </div>
             ) : (
               // Image with heatmap overlay
-              // Use inline-block so the wrapper shrinks to the actual image size
-              // preventing the SVG overlay from covering letterbox bars
+              // inline-block so wrapper shrinks to image size, preventing SVG from covering letterbox bars
               <div style={{ position: 'relative', display: 'inline-block', width: '100%', lineHeight: 0 }}>
                 <img
                   src={liveUrl}
@@ -239,18 +238,7 @@ function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
                   >
                     {regions.map((r, i) => {
                       const c = getColor(r.intensity)
-                      return (
-                        <rect
-                          key={i}
-                          x={r.x}
-                          y={r.y}
-                          width={r.width}
-                          height={r.height}
-                          fill={c.fill}
-                          stroke={c.stroke}
-                          strokeWidth="0.5"
-                        />
-                      )
+                      return <rect key={i} x={r.x} y={r.y} width={r.width} height={r.height} fill={c.fill} stroke={c.stroke} strokeWidth="0.5" />
                     })}
                   </svg>
                 )}
@@ -331,32 +319,6 @@ function AnalysisSummary({ summary }) {
   )
 }
 
-function FileDetails({ result }) {
-  const { theme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-  return (
-    <Card>
-      <CardHeader><CardTitle>File Details</CardTitle></CardHeader>
-      <CardBody>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {[{ label: 'Type', value: result.file_type || 'Image' }, { label: 'Faces Detected', value: result.total_faces }].map(({ label, value }) => (
-            <div key={label}>
-              <p style={{ margin: '0 0 3px', fontSize: '0.82rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>{label}</p>
-              <p style={{ margin: 0, fontWeight: '700', color: theme.text, textTransform: 'capitalize', fontSize: '1.04rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>{value}</p>
-            </div>
-          ))}
-          {result.file_url && (
-            <button onClick={() => window.open(result.file_url, '_blank')} style={{ marginTop: '0.35rem', width: '100%', padding: '0.8rem', backgroundColor: theme.primary, color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '0.95rem', fontFamily: FONT, fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'background-color 0.3s ease' }}>
-              View Original File
-            </button>
-          )}
-        </div>
-      </CardBody>
-    </Card>
-  )
-}
-
 export default function ScanResult({ result }) {
   const { theme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -373,7 +335,7 @@ export default function ScanResult({ result }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.8rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ margin: '0 0 6px', fontSize: '2rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>{result.file_name || 'Scan Result'}</h1>
-          <p style={{ margin: 0, color: theme.muted, fontSize: '0.96rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>
+          <p suppressHydrationWarning style={{ margin: 0, color: theme.muted, fontSize: '0.96rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>
             Analyzed on {mounted ? (() => {
               const ts = result.created_at || result.scanned_at
               if (!ts) return result.date || 'Unknown date'
@@ -392,7 +354,7 @@ export default function ScanResult({ result }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.5rem', alignItems: 'start' }}>
         <div>
           {result.temporal_data?.length > 0 && <TimelineGraph data={result.temporal_data} />}
-          {(result.file_type === 'video' || result.file_type === 'audio' || result.heatmap_regions?.length > 0) && (
+          {(result.file_type === 'video' || result.file_type === 'audio' || result.file_type === 'image' || result.heatmap_regions?.length > 0) && (
             <HeatmapDisplay
               fileUrl={result.file_url}
               fileType={result.file_type}
@@ -402,9 +364,8 @@ export default function ScanResult({ result }) {
           )}
         </div>
         <div>
-          {result.red_flags?.length > 0 && <RedFlagsList flags={result.red_flags} />}
           {result.analysis_summary && <AnalysisSummary summary={result.analysis_summary} />}
-          <FileDetails result={result} />
+          <RedFlagsList flags={result.red_flags || []} />
         </div>
       </div>
     </div>
