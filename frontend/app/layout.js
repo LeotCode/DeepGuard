@@ -8,7 +8,7 @@ function AppContent({ children }) {
   const { theme } = useTheme()
 
   return (
-    <body style={{
+    <body suppressHydrationWarning style={{
       margin: 0,
       background: theme.bg,
       color: theme.text,

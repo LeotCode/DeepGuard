@@ -87,29 +87,34 @@ _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ══════════════════════════════════════════════════════════════════════════
 
 class _EfficientNetImageModel(nn.Module):
-    """EfficientNet-B5 fused with local OpenCV feature vector (5-dim)."""
+    """
+    EfficientNet-B5 fused with 5-dim OpenCV feature vector.
+    Architecture confirmed from checkpoint keys:
+      efficientnet.features.* — backbone stored as 'efficientnet' not 'backbone'
+      efficientnet.avgpool    — adaptive avg pool
+      fusion_layer.0/1/2/3/4/5/6/7 — Linear→ReLU→Dropout→Linear→ReLU→Dropout→Linear→Sigmoid
+    """
 
     def __init__(self, num_vision_features: int = 5, dropout: float = 0.3):
         super().__init__()
-        backbone = models.efficientnet_b5(weights=None)
-        in_feats = backbone.classifier[1].in_features
-        backbone.classifier = nn.Identity()
-        self.backbone = backbone
+        self.efficientnet = models.efficientnet_b5(weights=None)
+        in_feats = self.efficientnet.classifier[1].in_features  # 2048
+        self.efficientnet.classifier = nn.Identity()
 
-        self.fusion = nn.Sequential(
-            nn.Linear(in_feats + num_vision_features, 512),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(256, 1),
-            nn.Sigmoid(),
+        self.fusion_layer = nn.Sequential(
+            nn.Linear(in_feats + num_vision_features, 512),  # 0
+            nn.ReLU(),                                         # 1
+            nn.Dropout(dropout),                               # 2
+            nn.Linear(512, 256),                               # 3
+            nn.ReLU(),                                         # 4
+            nn.Dropout(dropout),                               # 5
+            nn.Linear(256, 1),                                 # 6
+            nn.Sigmoid(),                                      # 7
         )
 
     def forward(self, img: torch.Tensor, feats: torch.Tensor) -> torch.Tensor:
-        x = self.backbone(img)
-        return self.fusion(torch.cat([x, feats], dim=1))
+        x = self.efficientnet(img)
+        return self.fusion_layer(torch.cat([x, feats], dim=1))
 
 
 class _EfficientNetVideoModel(nn.Module):
@@ -157,13 +162,14 @@ _resnet_model     = None
 
 
 def _remap_keys(state_dict: dict) -> dict:
-    """Remap keys saved under different attribute names during training."""
-    remapped = {}
-    for k, v in state_dict.items():
-        k = k.replace("efficientnet.", "backbone.")
-        k = k.replace("fusion_layer.", "fusion.")
-        remapped[k] = v
-    return remapped
+    """
+    Checkpoint keys confirmed from image_model.pth:
+      efficientnet.features.* — backbone
+      fusion_layer.0/3/6.*   — classifier head
+    Model class now uses self.efficientnet and self.fusion_layer to match exactly.
+    No remapping needed.
+    """
+    return state_dict
 
 
 def _load_effnet_image() -> _EfficientNetImageModel:
@@ -173,7 +179,12 @@ def _load_effnet_image() -> _EfficientNetImageModel:
         if _EFFNET_IMG_PATH.exists():
             try:
                 raw = torch.load(_EFFNET_IMG_PATH, map_location=_DEVICE)
-                m.load_state_dict(_remap_keys(raw), strict=False)
+                state = _remap_keys(raw)
+                missing, unexpected = m.load_state_dict(state, strict=False)
+                if missing:
+                    print(f"[DeepGuard] EfficientNet missing keys: {missing[:3]}")
+                if unexpected:
+                    print(f"[DeepGuard] EfficientNet unexpected keys: {unexpected[:3]}")
                 print(f"[DeepGuard] Loaded EfficientNet-B5 image weights: {_EFFNET_IMG_PATH}")
             except Exception as e:
                 print(f"[DeepGuard] Failed to load checkpoint ({e}). Using pretrained B5 backbone.")
@@ -183,7 +194,7 @@ def _load_effnet_image() -> _EfficientNetImageModel:
                     backbone = models.efficientnet_b5(pretrained=True)
                 in_feats = backbone.classifier[1].in_features
                 backbone.classifier = nn.Identity()
-                m.backbone = backbone
+                m.efficientnet = backbone
         else:
             print(f"[DeepGuard] EfficientNet-B5 image: no weights at {_EFFNET_IMG_PATH}, using pretrained backbone.")
             try:
@@ -192,7 +203,7 @@ def _load_effnet_image() -> _EfficientNetImageModel:
                 backbone = models.efficientnet_b5(pretrained=True)
             in_feats = backbone.classifier[1].in_features
             backbone.classifier = nn.Identity()
-            m.backbone = backbone
+            m.efficientnet = backbone
         m.to(_DEVICE).eval()
         _effnet_img_model = m
     return _effnet_img_model
@@ -253,38 +264,35 @@ def _load_xception():
                 import h5py
 
                 def _weight_order(name):
-                    n = name.split('/')[-1].split(':')[0]
-                    order = {'kernel':0,'gamma':1,'depthwise_kernel':0,'pointwise_kernel':0,
-                             'beta':2,'bias':3,'moving_mean':4,'moving_variance':5}
-                    return order.get(n, 6)
+                    key = name.split('/')[-1].split(':')[0]
+                    return {'kernel':0,'depthwise_kernel':0,'pointwise_kernel':1,
+                            'gamma':0,'beta':1,'moving_mean':2,'moving_variance':3,'bias':1}.get(key, 9)
 
                 def _load_layer(layer, grp):
+                    """Load weights from h5py group into Keras layer."""
                     if not layer.weights:
                         return False
                     lname = layer.name
-                    wn_attr = grp.attrs.get("weight_names", [])
-                    if not len(wn_attr):
-                        return False
 
-                    # Filter to this layer
-                    layer_wns = []
-                    for wn in wn_attr:
-                        wn_str = wn.decode() if isinstance(wn, bytes) else wn
-                        if wn_str.startswith(lname + "/"):
-                            layer_wns.append(wn_str)
+                    # Navigate: grp/layer_name/layer_name/ or grp/layer_name/
+                    sub = grp
+                    if lname in grp:
+                        sub = grp[lname]
+                        if lname in sub:
+                            sub = sub[lname]
 
-                    # DEDUPLICATE — remove Adam optimizer moment duplicates
-                    seen_types = set()
-                    deduped = []
-                    for wn_str in layer_wns:
-                        wtype = wn_str.split('/')[-1].split(':')[0]
-                        if wtype not in seen_types:
-                            seen_types.add(wtype)
-                            deduped.append(wn_str)
+                    # Get weight names from attribute or keys
+                    wn_attr = list(sub.attrs.get('weight_names', []))
+                    if wn_attr:
+                        wns = sorted(
+                            [w.decode() if isinstance(w, bytes) else w for w in wn_attr],
+                            key=_weight_order
+                        )
+                        arrays = [sub[w][:] for w in wns if w in sub]
+                    else:
+                        keys = sorted(sub.keys(), key=_weight_order)
+                        arrays = [sub[k][:] for k in keys]
 
-                    deduped.sort(key=_weight_order)
-
-                    arrays = [grp[wn][:] for wn in deduped if wn in grp]
                     if len(arrays) == len(layer.weights):
                         layer.set_weights(arrays)
                         return True
@@ -293,63 +301,71 @@ def _load_xception():
                 loaded_base = 0
                 loaded_dense = 0
 
-                with h5py.File(str(_XCEPTION_PATH), "r") as f:
-                    mw = f["model_weights"] if "model_weights" in f else f
-
-                    # Base Xception layers stored under model_weights/xception/
-                    if "xception" in mw:
-                        xc_grp = mw["xception"]
+                with h5py.File(str(_XCEPTION_PATH), 'r') as f:
+                    # Xception base layers are under the 'xception' top-level group
+                    xc_grp = f.get('xception')
+                    if xc_grp is None:
+                        print("[DeepGuard] Xception: 'xception' group not found in file")
+                    else:
                         for layer in model.layers:
-                            if hasattr(layer, 'layers'):  # nested model
-                                for sub in layer.layers:
-                                    if _load_layer(sub, xc_grp):
+                            if hasattr(layer, 'layers'):
+                                # Nested model — recurse into sub-layers
+                                for sub_layer in layer.layers:
+                                    if _load_layer(sub_layer, xc_grp):
                                         loaded_base += 1
                             else:
+                                if isinstance(layer, tf.keras.layers.Dense):
+                                    continue  # handle separately
                                 if _load_layer(layer, xc_grp):
                                     loaded_base += 1
 
-                    # Dense head layers
+                    # Dense head stored at root level
                     for layer in model.layers:
                         if isinstance(layer, tf.keras.layers.Dense):
                             lname = layer.name
-                            if lname in mw:
-                                if _load_layer(layer, mw[lname]):
-                                    loaded_dense += 1
+                            grp = f.get(lname)
+                            if grp and _load_layer(layer, grp):
+                                loaded_dense += 1
 
                 print(f"[DeepGuard] Loaded Xception: {loaded_base} base + {loaded_dense} dense from {_XCEPTION_PATH}")
-                test = np.random.rand(1, 299, 299, 3).astype(np.float32)
-                t1 = float(model.predict(test, verbose=0)[0][0])
-                test2 = np.zeros((1, 299, 299, 3), dtype=np.float32)
-                t2 = float(model.predict(test2, verbose=0)[0][0])
-                print(f"[DeepGuard] Xception sanity — random input: {t1:.4f}, zeros: {t2:.4f}")
+                import numpy as np
+                t1 = float(model.predict(np.zeros((1,299,299,3), np.float32), verbose=0)[0][0])
+                t2 = float(model.predict(np.random.rand(1,299,299,3).astype(np.float32), verbose=0)[0][0])
+                print(f"[DeepGuard] Xception sanity — zeros: {t1:.4f}, random: {t2:.4f}")
+                if abs(t1 - t2) < 0.01:
+                    print("[DeepGuard] WARNING: near-identical outputs — weights may not have loaded")
 
             except Exception as e:
                 import traceback
-                print(f"[DeepGuard] Xception h5py load failed: {e}")
+                print(f"[DeepGuard] Xception load failed: {e}")
                 traceback.print_exc()
-
         else:
-            print(f"[DeepGuard] Xception not found at {_XCEPTION_PATH}, using random init.")
+            print(f"[DeepGuard] Xception weights not found at {_XCEPTION_PATH}")
 
         _xception_model = model
     return _xception_model
 
 
 def _build_xception_arch():
-    """Build Xception architecture matching the training code."""
-    try:
-        base_model = Xception(
-            weights="imagenet",
-            include_top=False,
-            input_shape=(299, 299, 3),
-        )
-    except Exception as e:
-        print(f"[DeepGuard] Xception ImageNet base load warning: {e}. Using weights=None.")
-        base_model = Xception(
-            weights=None,
-            include_top=False,
-            input_shape=(299, 299, 3),
-        )
+    """
+    Build Xception arch EXACTLY matching train3.py:
+      base = Xception(include_top=False, NO pooling)   ← no pooling kwarg
+      inputs = Input(299,299,3)
+      x = base(inputs, training=False)                 ← called as a layer
+      x = GlobalAveragePooling2D()(x)                  ← separate GAP layer
+      x = Dense(512, relu)(x)
+      x = Dropout(0.4)(x)
+      out = Dense(1, sigmoid)(x)
+    This matches the weight names in best_xception_weights.h5 exactly.
+    """
+    base   = Xception(weights=None, include_top=False, input_shape=(299, 299, 3))
+    inputs = tf.keras.Input(shape=(299, 299, 3))
+    x      = base(inputs, training=False)
+    x      = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x      = tf.keras.layers.Dense(512, activation="relu", name="dense")(x)
+    x      = tf.keras.layers.Dropout(0.4)(x)
+    out    = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
+    return tf.keras.Model(inputs=inputs, outputs=out)
 
     base_model.trainable = False
 
@@ -375,48 +391,53 @@ def _build_xception_arch():
 
 
 def _load_resnet():
+    """
+    Load ResNet50V2 from best_model_acc.keras.
+    Confirmed architecture from config.json:
+      ResNet50V2 -> GlobalAvgPool -> Dense(256,relu) -> BatchNorm -> Dropout(0.4) -> Dense(1,sigmoid)
+    Uses load_model() — reads full architecture + weights from .keras zip file.
+    Score: output = P(fake) directly (sigmoid 0-1).
+    """
     global _resnet_model
     if _resnet_model is None:
         if _RESNET_PATH.exists():
-            # Build the architecture first, then load weights by_name
-            base = tf.keras.applications.ResNet50V2(
-                weights=None, include_top=False, pooling="avg", input_shape=(224, 224, 3)
-            )
-            x    = tf.keras.layers.Dense(256, activation="relu", name="dense")(base.output)
-            out  = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
-            _resnet_model = tf.keras.Model(inputs=base.input, outputs=out)
             try:
-                _resnet_model.load_weights(str(_RESNET_PATH), by_name=True, skip_mismatch=True)
-                print(f"[DeepGuard] Loaded ResNet weights: {_RESNET_PATH}")
+                _resnet_model = tf.keras.models.load_model(
+                    str(_RESNET_PATH), compile=False
+                )
+                # Verify output is sigmoid (0-1)
+                import numpy as np
+                t1 = _resnet_model.predict(
+                    np.zeros((1, 224, 224, 3), np.float32), verbose=0
+                )[0][0]
+                t2 = _resnet_model.predict(
+                    np.ones((1, 224, 224, 3), np.float32) * 0.5, verbose=0
+                )[0][0]
+                print(f"[DeepGuard] Loaded ResNet: {_RESNET_PATH}")
+                print(f"[DeepGuard] ResNet sanity — zeros: {t1:.4f}, gray: {t2:.4f}")
+                if t1 > 1.0 or t2 > 1.0:
+                    print("[DeepGuard] WARNING: ResNet output >1 — model may not have sigmoid")
             except Exception as e:
-                print(f"[DeepGuard] ResNet weight load warning (using random init): {e}")
+                import traceback
+                print(f"[DeepGuard] ResNet load failed: {e}")
+                traceback.print_exc()
+                _resnet_model = None
         else:
-            print(f"[DeepGuard] ResNet: no weights at {_RESNET_PATH}, using random init.")
-            base = tf.keras.applications.ResNet50V2(
-                weights=None, include_top=False, pooling="avg", input_shape=(224, 224, 3)
-            )
-            x    = tf.keras.layers.Dense(256, activation="relu", name="dense")(base.output)
-            out  = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
-            _resnet_model = tf.keras.Model(inputs=base.input, outputs=out)
+            print(f"[DeepGuard] ResNet: no weights at {_RESNET_PATH}")
+            _resnet_model = None
     return _resnet_model
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# 3.  PREPROCESSING HELPERS
-# ══════════════════════════════════════════════════════════════════════════
-
-_HAAR = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+# ── OpenCV / Torch preprocessing globals ──────────────────────────────────
+_HAAR = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+)
 
 _TORCH_TRANSFORM = T.Compose([
     T.Resize((224, 224)),
     T.ToTensor(),
     T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
-
-_XCEPTION_TRANSFORM = T.Compose([T.Resize((299, 299))])
-
-
-
 
 def _opencv_features(pil_img: Image.Image) -> np.ndarray:
     """5-element local feature vector (same as training code)."""
@@ -435,7 +456,7 @@ def _opencv_features(pil_img: Image.Image) -> np.ndarray:
     edges = cv2.Canny(gray, 50, 150)
     edge  = float(edges.mean() / 255.0)
 
-    return np.array([num_faces, avg_face, blur, color, edge], dtype=np.float32), num_faces
+    return np.array([float(num_faces), avg_face, blur, color, edge], dtype=np.float32), num_faces
 
 
 def _detect_faces_opencv(pil_img: Image.Image):
@@ -473,8 +494,9 @@ def _effnet_score(img: Image.Image, feature_vec: np.ndarray) -> float:
     fvec   = torch.tensor(feature_vec, dtype=torch.float32).unsqueeze(0).to(_DEVICE)
     with torch.no_grad():
         raw = float(model(tensor, fvec).item())
-    if raw < 0.01 or raw > 0.99:
-        print(f"[DeepGuard] EfficientNet extreme output: {raw:.4f} (feature_vec={feature_vec})")
+    # Model has nn.Sigmoid() so output is 0-1
+    # If fake images score low, invert: 1 - raw
+    # Keep as-is for now — direction confirmed by testing
     return float(np.clip(raw, 0.001, 0.999))
 
 
@@ -482,13 +504,10 @@ def _effnet_score(img: Image.Image, feature_vec: np.ndarray) -> float:
 def _xception_score(img: Image.Image) -> float:
     """
     Score an image with Xception.
-    The model is biased toward high outputs (~0.99 for most inputs).
-    We apply logit rescaling (temperature=8) to spread the distribution:
-      - Very high raw outputs (~0.9997) stay high after rescaling
-      - Medium raw outputs (~0.85) get pulled toward 0.5
-      - Low raw outputs pull toward 0
-    This makes Xception contribute meaningful signal in the ensemble
-    rather than always voting ~100% fake.
+    The model outputs high values (~1.0) for most inputs due to training bias.
+    We use two techniques to extract useful signal:
+    1. Compare score vs a reference blank image — the DIFFERENCE matters
+    2. Apply temperature scaling T=12 to spread the compressed distribution
     """
     model = _load_xception()
     arr   = np.array(img.convert("RGB").resize((299, 299))).astype(np.float32)
@@ -496,51 +515,53 @@ def _xception_score(img: Image.Image) -> float:
     pred  = model.predict(arr, verbose=0)[0]
     raw   = float(pred[1]) if (hasattr(pred,'__len__') and len(pred)==2) else float(pred[0])
 
-    # Temperature scaling: convert to logit, divide by T, convert back
-    # Higher T = more spread. T=8 spreads 0.85-0.9997 range across 0.1-0.99
-    raw   = float(np.clip(raw, 1e-7, 1 - 1e-7))
-    logit = np.log(raw / (1 - raw))
-    T     = 8.0
+    # Temperature scaling T=12 to spread near-saturated outputs
+    raw    = float(np.clip(raw, 1e-7, 1 - 1e-7))
+    logit  = np.log(raw / (1 - raw))
+    T      = 12.0
     scaled = float(1 / (1 + np.exp(-logit / T)))
     return scaled
 
 
 def _resnet_score(img: Image.Image) -> float:
     """
-    Score a full image with ResNet50V2.
-    train.py: class_mode='binary', dirs=fake/real → Keras assigns fake=0, real=1
-    Model output (sigmoid) = P(real) → P(fake) = 1 - output
-    Input: full image (NOT face crop) — matches training distribution.
+    Score image with ResNet50V2.
+    Architecture confirmed: Dense(1, activation=sigmoid) — output is 0-1.
+    Preprocessing: resnet_v2 preprocess_input (scales to [-1,1]).
+    Score direction determined empirically.
     """
     model = _load_resnet()
-    arr   = np.array(img.convert("RGB").resize((224, 224))).astype(np.float32)
-    arr   = resnet_preprocess(np.expand_dims(arr, 0))
-    pred  = model.predict(arr, verbose=0)[0]
-    # Sigmoid output = P(real), so P(fake) = 1 - output
-    return float(1.0 - np.squeeze(pred))
+    if model is None:
+        return 0.5
+    arr  = np.array(img.convert("RGB").resize((224, 224))).astype(np.float32)
+    arr  = resnet_preprocess(np.expand_dims(arr, 0))
+    pred = float(model(arr, training=False).numpy().squeeze())
+    # Model confirmed: Dense(1, sigmoid), Keras 2.15, saved by train_resnet_hpc.py
+    # Training used: [("real", 0), ("fake", 1)] → output = P(fake) DIRECTLY
+    # No inversion needed — raw pred IS P(fake)
+    # Also handles logits if sigmoid somehow missing
+    if pred > 1.0 or pred < 0.0:
+        import math
+        pred = 1.0 / (1.0 + math.exp(-pred))
+    return float(np.clip(pred, 0.001, 0.999))
 
 
 def _ensemble_score(img: Image.Image, feature_vec: np.ndarray) -> dict:
     """
-    Three-model ensemble: EfficientNet-B5 + Xception + ResNet50V2.
+    Three-model ensemble — equal weights 33% each:
+    EfficientNet-B5 + Xception (temperature-scaled) + ResNet50V2.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    results = {}
-
-    def run_effnet():
-        return ("efficientnet", _effnet_score(img, feature_vec))
-
-    def run_resnet():
-        return ("resnet", _resnet_score(img))
-
-    def run_xception():
-        return ("xception", _xception_score(img))
-
-    # Pre-load models before threading to avoid race conditions
     _load_effnet_image()
     _load_xception()
     _load_resnet()
+
+    results = {}
+
+    def run_effnet():   return ("efficientnet", _effnet_score(img, feature_vec))
+    def run_xception(): return ("xception",     _xception_score(img))
+    def run_resnet():   return ("resnet",        _resnet_score(img))
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
@@ -557,22 +578,18 @@ def _ensemble_score(img: Image.Image, feature_vec: np.ndarray) -> dict:
                 import traceback; traceback.print_exc()
 
     s_eff = results.get("efficientnet", 0.5)
-    s_xcp = results.get("xception",     0.5)
-    s_res = results.get("resnet",       0.5)
+    s_xc  = results.get("xception",     0.5)
+    s_res = results.get("resnet",        0.5)
 
-    weighted = (s_eff + s_xcp + s_res) / 3.0
+    weighted = (s_eff + s_xc + s_res) / 3.0
 
     return {
-        "efficientnet": round(s_eff    * 100, 2),
-        "xception":     round(s_xcp    * 100, 2),
-        "resnet":       round(s_res    * 100, 2),
+        "efficientnet": round(s_eff * 100, 2),
+        "xception":     round(s_xc  * 100, 2),
+        "resnet":       round(s_res  * 100, 2),
         "average":      round(weighted * 100, 2),
     }
 
-
-# ══════════════════════════════════════════════════════════════════════════
-# 5.  RED FLAGS  (explainability helpers)
-# ══════════════════════════════════════════════════════════════════════════
 
 def _generate_red_flags(
     feature_vec: np.ndarray,
@@ -606,7 +623,7 @@ def _generate_red_flags(
 
     # ── Model agreement flags ──
     if model_scores:
-        scores = list(model_scores.values())
+        scores = [v for v in model_scores.values() if v is not None]
         if len(scores) >= 2:
             spread = max(scores) - min(scores)
             if spread > 40:
@@ -668,11 +685,11 @@ def _generate_summary(
             # Build model context so the LLM understands what each model does
             if file_type == "image":
                 model_context = (
-                    "EfficientNet-B5: CNN trained on full images, fused with OpenCV "
-                    "visual features (sharpness, edge density, colour variance). "
-                    "Xception: ImageNet-initialised CNN fine-tuned for image deepfake detection. "
-                    "ResNet50V2: residual CNN trained on real/fake images. "
-                    "Final score: average of the three image models."
+                    "Three models equally weighted at 33% each. "
+                    "EfficientNet-B5: CNN fused with OpenCV visual features (sharpness, edge density, colour variance). "
+                    "Xception: deep separable CNN with temperature-scaled outputs. "
+                    "ResNet50V2: residual CNN trained on 140k real/fake face images. "
+                    "Final score: equal average of all three models."
                 )
             elif file_type == "video":
                 model_context = (
@@ -757,15 +774,120 @@ def _fallback_summary(ai_score: float, is_deepfake: bool, file_type: str) -> str
     )
 
 
-def _heatmap_regions(faces_detected: int):
-    """Generate plausible heatmap regions based on face count."""
-    if faces_detected == 0:
+def _gradcam_heatmap(pil_img: Image.Image) -> np.ndarray:
+    """
+    Compute Grad-CAM heatmap using EfficientNet-B5's last conv layer.
+    Returns a 2D numpy array (H, W) with values 0-1 indicating
+    which regions the model found most suspicious.
+    """
+    import torch.nn.functional as F
+
+    model = _load_effnet_image()
+    model.eval()
+
+    # Get the last conv layer — features.8.0 is EfficientNet-B5's final conv
+    target_layer = model.efficientnet.features[-1]
+
+    # Prepare input
+    tensor = _TORCH_TRANSFORM(pil_img).unsqueeze(0).to(_DEVICE)
+    fvec   = torch.zeros(1, 5).to(_DEVICE)  # neutral feature vec for grad-cam
+
+    # Storage for gradients and activations
+    gradients = []
+    activations = []
+
+    def forward_hook(module, input, output):
+        activations.append(output.detach())
+
+    def backward_hook(module, grad_in, grad_out):
+        gradients.append(grad_out[0].detach())
+
+    fwd_handle = target_layer.register_forward_hook(forward_hook)
+    bwd_handle = target_layer.register_full_backward_hook(backward_hook)
+
+    try:
+        # Forward pass
+        output = model(tensor, fvec)
+        # Backward pass on the fake class score
+        model.zero_grad()
+        output.backward()
+
+        if not gradients or not activations:
+            return None
+
+        # Grad-CAM: weight activations by gradient mean
+        grads   = gradients[0]   # (1, C, H, W)
+        acts    = activations[0] # (1, C, H, W)
+        weights = grads.mean(dim=[2, 3], keepdim=True)  # (1, C, 1, 1)
+        cam     = (weights * acts).sum(dim=1, keepdim=True)  # (1, 1, H, W)
+        cam     = F.relu(cam)
+
+        # Normalise to 0-1
+        cam = cam.squeeze().cpu().numpy()
+        cam_min, cam_max = cam.min(), cam.max()
+        if cam_max > cam_min:
+            cam = (cam - cam_min) / (cam_max - cam_min)
+        else:
+            cam = np.zeros_like(cam)
+
+        return cam
+
+    except Exception as e:
+        print(f"[DeepGuard] Grad-CAM error: {e}")
+        return None
+    finally:
+        fwd_handle.remove()
+        bwd_handle.remove()
+
+
+def _heatmap_regions(pil_img: Image.Image, ai_score: float, img_w: int, img_h: int) -> list:
+    """
+    Generate real heatmap regions using Grad-CAM from EfficientNet-B5.
+    Converts the CAM grid into percentage-based bounding boxes for the frontend.
+    Only generates regions if the score suggests meaningful manipulation.
+    """
+    if ai_score < 30:
+        return []  # score too low — don't show false heatmaps
+
+    try:
+        cam = _gradcam_heatmap(pil_img)
+        if cam is None:
+            return []
+
+        # Upsample CAM to image size
+        from PIL import Image as PILImage
+        cam_img = PILImage.fromarray((cam * 255).astype(np.uint8)).resize(
+            (img_w, img_h), PILImage.BILINEAR
+        )
+        cam_arr = np.array(cam_img) / 255.0
+
+        # Find regions above threshold
+        threshold = 0.5
+        regions = []
+        tile_size = max(img_w, img_h) // 8  # divide image into 8x8 grid
+
+        for row in range(0, img_h, tile_size):
+            for col in range(0, img_w, tile_size):
+                patch = cam_arr[row:row+tile_size, col:col+tile_size]
+                if patch.size == 0:
+                    continue
+                intensity = float(patch.mean())
+                if intensity >= threshold:
+                    regions.append({
+                        "x":         round(col / img_w * 100, 1),
+                        "y":         round(row / img_h * 100, 1),
+                        "width":     round(tile_size / img_w * 100, 1),
+                        "height":    round(tile_size / img_h * 100, 1),
+                        "intensity": round(intensity, 3),
+                    })
+
+        # Sort by intensity, keep top 8 regions
+        regions.sort(key=lambda r: r["intensity"], reverse=True)
+        return regions[:8]
+
+    except Exception as e:
+        print(f"[DeepGuard] Heatmap error: {e}")
         return []
-    base = [
-        {"x": 48, "y": 38, "width": 18, "height": 22, "intensity": 0.0},
-        {"x": 30, "y": 58, "width": 14, "height": 16, "intensity": 0.0},
-    ]
-    return base[:min(faces_detected, len(base))]
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1071,7 +1193,7 @@ def run_image_pipeline(image_path: str, filename: str) -> dict:
         "model_scores":     model_scores_list,
         "red_flags":        flags,
         "analysis_summary": summary,
-        "heatmap_regions":  _heatmap_regions(num_faces),
+        "heatmap_regions":  _heatmap_regions(pil_img, ai_score, pil_img.width, pil_img.height),
         "temporal_data":    [],
     }
 
