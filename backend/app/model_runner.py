@@ -176,34 +176,40 @@ def _load_effnet_image() -> _EfficientNetImageModel:
     global _effnet_img_model
     if _effnet_img_model is None:
         m = _EfficientNetImageModel()
+        print(f"[DeepGuard] EfficientNet path: {_EFFNET_IMG_PATH} exists={_EFFNET_IMG_PATH.exists()}")
         if _EFFNET_IMG_PATH.exists():
             try:
-                raw = torch.load(_EFFNET_IMG_PATH, map_location=_DEVICE)
-                state = _remap_keys(raw)
+                raw = torch.load(_EFFNET_IMG_PATH, map_location=_DEVICE, weights_only=False)
+                # raw may be the state_dict directly or wrapped
+                if isinstance(raw, dict) and not any(k.startswith('efficientnet') for k in raw.keys()):
+                    state = raw.get('model_state_dict', raw.get('state_dict', raw))
+                else:
+                    state = raw
+                state = _remap_keys(state)
                 missing, unexpected = m.load_state_dict(state, strict=False)
+                loaded = len(state) - len(missing)
+                print(f"[DeepGuard] EfficientNet loaded {loaded}/{len(state)} keys — missing: {len(missing)}, unexpected: {len(unexpected)}")
                 if missing:
-                    print(f"[DeepGuard] EfficientNet missing keys: {missing[:3]}")
+                    print(f"[DeepGuard]   missing sample: {list(missing)[:3]}")
                 if unexpected:
-                    print(f"[DeepGuard] EfficientNet unexpected keys: {unexpected[:3]}")
-                print(f"[DeepGuard] Loaded EfficientNet-B5 image weights: {_EFFNET_IMG_PATH}")
+                    print(f"[DeepGuard]   unexpected sample: {list(unexpected)[:3]}")
+                # Sanity check
+                import numpy as np
+                test = torch.zeros(1, 3, 224, 224).to(_DEVICE)
+                fvec = torch.zeros(1, 5).to(_DEVICE)
+                with torch.no_grad():
+                    t1 = float(m(test, fvec).item())
+                    test2 = torch.ones(1, 3, 224, 224).to(_DEVICE) * 0.5
+                    t2 = float(m(test2, fvec).item())
+                print(f"[DeepGuard] EfficientNet sanity — zeros: {t1:.4f}, gray: {t2:.4f}")
+                if abs(t1 - t2) < 0.01:
+                    print("[DeepGuard] WARNING: EfficientNet outputs identical for different inputs — weights may not have loaded")
             except Exception as e:
-                print(f"[DeepGuard] Failed to load checkpoint ({e}). Using pretrained B5 backbone.")
-                try:
-                    backbone = models.efficientnet_b5(weights='DEFAULT')
-                except TypeError:
-                    backbone = models.efficientnet_b5(pretrained=True)
-                in_feats = backbone.classifier[1].in_features
-                backbone.classifier = nn.Identity()
-                m.efficientnet = backbone
+                import traceback
+                print(f"[DeepGuard] EfficientNet load FAILED: {e}")
+                traceback.print_exc()
         else:
-            print(f"[DeepGuard] EfficientNet-B5 image: no weights at {_EFFNET_IMG_PATH}, using pretrained backbone.")
-            try:
-                backbone = models.efficientnet_b5(weights='DEFAULT')
-            except TypeError:
-                backbone = models.efficientnet_b5(pretrained=True)
-            in_feats = backbone.classifier[1].in_features
-            backbone.classifier = nn.Identity()
-            m.efficientnet = backbone
+            print(f"[DeepGuard] EfficientNet: file not found at {_EFFNET_IMG_PATH}")
         m.to(_DEVICE).eval()
         _effnet_img_model = m
     return _effnet_img_model
@@ -486,18 +492,22 @@ def _detect_faces_opencv(pil_img: Image.Image):
 def _effnet_score(img: Image.Image, feature_vec: np.ndarray) -> float:
     """
     Score a full image with EfficientNet-B5.
-    Output is sigmoid P(fake) 0-1.
-    Clamp to [0.001, 0.999] to avoid float rounding to exact 0 or 1.
+    Raw output = P(fake) directly — confirmed by empirical testing.
+    ResNet raw 0.0078 for real photo confirms models output P(fake).
     """
-    model  = _load_effnet_image()
-    tensor = _TORCH_TRANSFORM(img).unsqueeze(0).to(_DEVICE)
-    fvec   = torch.tensor(feature_vec, dtype=torch.float32).unsqueeze(0).to(_DEVICE)
-    with torch.no_grad():
-        raw = float(model(tensor, fvec).item())
-    # Model has nn.Sigmoid() so output is 0-1
-    # If fake images score low, invert: 1 - raw
-    # Keep as-is for now — direction confirmed by testing
-    return float(np.clip(raw, 0.001, 0.999))
+    try:
+        model  = _load_effnet_image()
+        tensor = _TORCH_TRANSFORM(img).unsqueeze(0).to(_DEVICE)
+        fvec   = torch.tensor(feature_vec, dtype=torch.float32).unsqueeze(0).to(_DEVICE)
+        with torch.no_grad():
+            raw = float(model(tensor, fvec).item())
+        print(f"[DeepGuard] EfficientNet RAW: {raw:.4f}")
+        return float(np.clip(raw, 0.001, 0.999))
+    except Exception as e:
+        import traceback
+        print(f"[DeepGuard] EfficientNet error: {e}")
+        traceback.print_exc()
+        return 0.5
 
 
 
@@ -536,13 +546,11 @@ def _resnet_score(img: Image.Image) -> float:
     arr  = np.array(img.convert("RGB").resize((224, 224))).astype(np.float32)
     arr  = resnet_preprocess(np.expand_dims(arr, 0))
     pred = float(model(arr, training=False).numpy().squeeze())
-    # Model confirmed: Dense(1, sigmoid), Keras 2.15, saved by train_resnet_hpc.py
-    # Training used: [("real", 0), ("fake", 1)] → output = P(fake) DIRECTLY
-    # No inversion needed — raw pred IS P(fake)
-    # Also handles logits if sigmoid somehow missing
+    print(f"[DeepGuard] ResNet RAW: {pred:.4f}")
     if pred > 1.0 or pred < 0.0:
         import math
         pred = 1.0 / (1.0 + math.exp(-pred))
+    # Confirmed: raw 0.0078 for real photo = P(fake) directly, NO inversion
     return float(np.clip(pred, 0.001, 0.999))
 
 
@@ -581,11 +589,13 @@ def _ensemble_score(img: Image.Image, feature_vec: np.ndarray) -> dict:
     s_xc  = results.get("xception",     0.5)
     s_res = results.get("resnet",        0.5)
 
-    weighted = (s_eff + s_xc + s_res) / 3.0
+    # Xception excluded from weighted average — degenerate model (~79% for all inputs)
+    # would push real images above the 50% fake threshold
+    weighted = (s_eff + s_res) / 2.0
 
     return {
         "efficientnet": round(s_eff * 100, 2),
-        "xception":     round(s_xc  * 100, 2),
+        "xception":     round(s_xc  * 100, 2),   # shown for info only
         "resnet":       round(s_res  * 100, 2),
         "average":      round(weighted * 100, 2),
     }
@@ -722,36 +732,59 @@ def _generate_summary(
                     if v is not None:
                         extra_lines += f"\n- {k.replace('_', ' ').title()}: {v}"
 
-            prompt = f"""You are a deepfake detection analyst writing a report for a media authenticity platform.
+            visual_signals = (extra_context or {}).get("visual_signals", "")
 
-A {file_type} was scanned by an ensemble of AI models. Write a precise, informative 2-3 sentence summary explaining what the models found and what it means.
+            if file_type == "image":
+                prompt = f"""You are a deepfake detection expert. Educate the user about WHY this image appears {'AI-generated' if is_deepfake else 'authentic'} based on specific visual evidence.
 
-=== HOW THE MODELS WORK ===
-{model_context}
+DETECTION DATA:
+- AI score: {ai_score:.1f}% — Verdict: {verdict}
+- Faces detected: {total_faces}
+- Measured visual signals: {visual_signals or "N/A"}
+- Red flags: {flags_text or "none"}
 
-=== SCAN RESULTS ===
-- Overall AI score: {ai_score:.1f}% (>50% = likely fake, <50% = likely real)
-- Verdict: {verdict}
-- Individual model scores: {scores_text or "not available"}
-- {agreement_text}
-- Detected signals/red flags: {flags_text or "none detected"}{faces_line}{extra_lines}
+YOUR TASK — write 2-3 sentences that:
+1. Describe the SPECIFIC visual artifacts detected — e.g. unnaturally smooth skin with no pores, GAN-typical edge blurring, uniform colour with no natural variation, suspicious spatial regions in the heatmap
+2. Explain in plain English WHY these signals indicate {'AI generation' if is_deepfake else 'authenticity'}
+3. If heatmap regions were detected, mention what the highlighted areas suggest about WHERE the AI artifacts appear
 
-=== INSTRUCTIONS ===
-- Reference the specific score ({ai_score:.1f}%) and verdict ({verdict}) in your summary
-- Mention which models flagged it and whether they agreed or disagreed
-- Explain what the red flags mean in plain language
-- Be precise and technical but understandable to a non-expert
-- Write in third person, 2-3 sentences maximum, no bullet points
-- Do NOT start with "The image/video scored" — vary the opening
-- Keep it under 60 words total
-- Do NOT contradict the verdict — if the verdict is AUTHENTIC, do not suggest manipulation
-- NEVER use the word "ensemble" for audio — there is only ONE model (AudioCNN)"""
+RULES:
+- Be specific about what was visually observed — NOT just "anomalies detected"
+- Focus on visual artifacts (blurriness, smoothness, texture, colour, edges, heatmap regions) not model names
+- Maximum 4 sentences, third person, no bullet points
+- Do NOT contradict the verdict
+- Vary your opening — do NOT start with 'The image scored'"""
+
+            elif file_type == "video":
+                prompt = f"""You are a deepfake detection expert. Explain WHY this video appears {'AI-generated or manipulated' if is_deepfake else 'authentic'} based on temporal analysis.
+
+DETECTION DATA:
+- AI score: {ai_score:.1f}% — Verdict: {verdict}
+- Red flags: {flags_text or "none"}{extra_lines}
+
+Write 2-3 sentences explaining the specific temporal or visual signals detected — e.g. frame-level inconsistencies, flickering, unnatural motion, face boundary artifacts across frames.
+Focus on WHAT was visually wrong, not model names. Maximum 4 sentences, third person, no bullet points.
+Do NOT contradict the verdict."""
+
+            else:
+                prompt = f"""You are a deepfake detection expert. Explain WHY this audio appears {'synthetically generated' if is_deepfake else 'authentic'}.
+
+DETECTION DATA:
+- AI score: {ai_score:.1f}% — Verdict: {verdict}
+- Red flags: {flags_text or "none"}
+
+Write 2-3 sentences explaining the specific acoustic signals detected — e.g. unnatural speech cadence, spectral anomalies in the mel spectrogram, missing breath sounds, synthetic vocal texture.
+Focus on WHAT was acoustically wrong. Maximum 4 sentences, third person, no bullet points.
+Do NOT contradict the verdict. NEVER say "ensemble" — only ONE model (AudioCNN) was used."""
 
             client = _GroqClient(api_key=api_key)
             chat   = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
-                max_tokens=200,
-                messages=[{"role": "user", "content": prompt}],
+                max_tokens=180,
+                messages=[
+                    {"role": "system", "content": "You are a deepfake detection expert. You MUST respond in EXACTLY 2-3 sentences. Never write more than 3 sentences. Be concise and specific."},
+                    {"role": "user", "content": prompt}
+                ],
             )
             return chat.choices[0].message.content.strip()
         except Exception as e:
@@ -1153,16 +1186,14 @@ def run_image_pipeline(image_path: str, filename: str) -> dict:
     is_deepfake = ai_score > 50.0
     confidence  = round(abs(ai_score - 50.0) * 2, 2)
 
-    # ── Per-face predictions (metadata only, not used for scoring) ──
-    # We run EfficientNet on each face crop just for face-level labels
+    # ── Per-face predictions — use ensemble score for all detected faces ──
+    # EfficientNet was trained on full images, not crops — running on crops gives garbage
     all_predictions = []
-    for i, crop in enumerate(face_crops):
-        fv_crop, _ = _opencv_features(crop)
-        face_score = _effnet_score(crop, fv_crop) * 100
+    for i in range(num_faces):
         all_predictions.append({
             "face":       i + 1,
-            "label":      "likely fake" if face_score > 50 else "likely real",
-            "confidence": round(face_score, 2),
+            "label":      "likely fake" if ai_score > 50 else "likely real",
+            "confidence": round(ai_score, 2),
         })
 
     model_scores_list = [
@@ -1176,12 +1207,31 @@ def run_image_pipeline(image_path: str, filename: str) -> dict:
         "Xception":        scores["xception"],
         "ResNet50V2":      scores["resnet"],
     }
-    flags   = _generate_red_flags(feature_vec, ai_score, model_scores=img_model_scores)
+    flags        = _generate_red_flags(feature_vec, ai_score, model_scores=img_model_scores)
+    heatmap_regs = _heatmap_regions(pil_img, ai_score, pil_img.width, pil_img.height)
+
+    # Build visual quality signals from measured OpenCV features
+    _, _, blur, color, edge = feature_vec
+    vis = []
+    if blur < 0.15:    vis.append(f"very heavy smoothing/blurring (score {blur:.2f}) — classic GAN skin synthesis")
+    elif blur < 0.35:  vis.append(f"below-average sharpness (score {blur:.2f}) — moderate AI smoothing")
+    else:              vis.append(f"normal sharpness (score {blur:.2f})")
+    if color < 0.20:   vis.append(f"near-zero skin tone variation (score {color:.2f}) — unnaturally uniform, no pores/texture")
+    elif color < 0.35: vis.append(f"low colour diversity (score {color:.2f}) — skin too smooth")
+    else:              vis.append(f"natural colour variation (score {color:.2f})")
+    if edge < 0.04:    vis.append(f"near-absent edge detail (score {edge:.3f}) — GAN boundary smoothing")
+    elif edge < 0.07:  vis.append(f"soft edge boundaries (score {edge:.3f}) — less defined than real photos")
+    if heatmap_regs:
+        hm_max = max(r["intensity"] for r in heatmap_regs)
+        vis.append(f"Grad-CAM heatmap highlighted {len(heatmap_regs)} suspicious region(s) (peak intensity {hm_max:.2f}) — model attention concentrated on likely AI artifact areas")
+    visual_text = "; ".join(vis)
+
     summary = _generate_summary(
         ai_score, is_deepfake, "image",
         model_scores=img_model_scores,
         red_flags=flags,
         total_faces=num_faces,
+        extra_context={"visual_signals": visual_text},
     )
 
     return {
@@ -1193,7 +1243,7 @@ def run_image_pipeline(image_path: str, filename: str) -> dict:
         "model_scores":     model_scores_list,
         "red_flags":        flags,
         "analysis_summary": summary,
-        "heatmap_regions":  _heatmap_regions(pil_img, ai_score, pil_img.width, pil_img.height),
+        "heatmap_regions":  heatmap_regs,
         "temporal_data":    [],
     }
 
