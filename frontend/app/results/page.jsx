@@ -67,8 +67,8 @@ export default function Results() {
             // Videos have no per-face predictions — use ai_score + is_deepfake instead
             const score   = item.ai_score ?? top?.confidence ?? 0
             const isVideo = item.file_type === 'video' || item.file_type === 'audio'
-            const isFake  = item.ai_score != null ? item.ai_score > 50 : (item.is_deepfake ?? false)
-            const label   = isFake ? 'Fake' : 'Real'
+            const isFake  = isVideo ? item.is_deepfake : top?.label === 'likely fake'
+            const label   = isVideo ? (isFake ? 'Likely Fake' : 'Likely Real') : (isFake ? 'Likely Fake' : 'Likely Real')
             const color   = isFake ? '#ef4444' : '#22c55e'
             const bgBadge = isFake ? '#fef2f2' : '#f0fdf4'
 
@@ -135,9 +135,6 @@ export default function Results() {
                     <div style={{ height: '100%', width: `${score}%`, backgroundColor: color, borderRadius: '4px' }} />
                   </div>
 
-                  <p style={{ color: theme.muted, fontSize: '0.75rem', margin: '0.6rem 0 0', fontFamily: FONT, transition: 'color 0.3s ease' }}>
-                    {item.date} · {item.total_faces} face(s)
-                  </p>
                 </div>
               </div>
             )

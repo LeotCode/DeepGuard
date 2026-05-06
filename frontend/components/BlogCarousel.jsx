@@ -125,14 +125,14 @@ export default function BlogCarousel() {
         </h2>
       </div>
 
-      <div style={{ maxWidth: '820px', margin: '0 auto', backgroundColor: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '2.5rem 3rem', display: 'grid', gridTemplateColumns: '1fr 160px', gap: '2.5rem', alignItems: 'center', opacity: fading ? 0 : 1, transform: fading ? `translateX(${dir === 'right' ? '-20px' : '20px'})` : 'translateX(0)', transition: 'opacity 0.3s ease, transform 0.3s ease, border-color 0.3s ease', boxSizing: 'border-box', cursor: 'pointer' }} onClick={() => window.open(post.link, '_blank')} onMouseEnter={e => { setIsHovered(true); e.currentTarget.style.borderColor = theme.primary; e.currentTarget.style.opacity = '0.9' }} onMouseLeave={e => { setIsHovered(false); e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.opacity = '1' }}>
+      <div style={{ maxWidth: '820px', margin: '0 auto', backgroundColor: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '2.5rem 3rem', display: 'grid', gridTemplateColumns: '1fr 160px', gap: '2.5rem', alignItems: 'center', opacity: fading ? 0 : 1, transform: fading ? `translateX(${dir === 'right' ? '-20px' : '20px'})` : 'translateX(0)', transition: 'opacity 0.3s ease, transform 0.3s ease, border-color 0.3s ease', boxSizing: 'border-box', cursor: 'pointer', minHeight: '180px', overflow: 'hidden' }} onClick={() => window.open(post.link, '_blank')} onMouseEnter={e => { setIsHovered(true); e.currentTarget.style.borderColor = theme.primary; e.currentTarget.style.opacity = '0.9' }} onMouseLeave={e => { setIsHovered(false); e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.opacity = '1' }}>
 
         <div>
           <span style={{ display: 'inline-block', backgroundColor: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', color: theme.primary, fontSize: '0.6rem', letterSpacing: '3px', textTransform: 'uppercase', padding: '3px 10px', borderRadius: '4px', marginBottom: '1.1rem', fontWeight: '700', transition: 'color 0.3s ease' }}>
             {post.tag}
           </span>
           <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: theme.text, letterSpacing: '1px', textTransform: 'uppercase', margin: '0 0 0.85rem 0', lineHeight: 1.3, transition: 'color 0.3s ease' }}>{post.title}</h3>
-          <p style={{ color: theme.muted, fontSize: '0.9rem', lineHeight: 1.75, margin: 0, transition: 'color 0.3s ease' }}>{post.body}</p>
+          <p style={{ color: theme.muted, fontSize: '0.9rem', lineHeight: 1.75, margin: 0, transition: 'color 0.3s ease', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{post.body}</p>
         </div>
 
         <div style={{ borderLeft: `1px solid ${theme.border}`, paddingLeft: '1.0rem', textAlign: 'center', transition: 'border-color 0.3s ease' }}>

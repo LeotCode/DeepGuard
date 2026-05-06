@@ -23,7 +23,6 @@ export default function Navbar() {
     { label: 'Scan', href: '/' },
     { label: 'Game', href: '/game' },
     { label: 'Results', href: '/results' },
-    { label: 'Settings', href: '/settings' },
   ]
 
   return (

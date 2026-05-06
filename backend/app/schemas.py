@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 class FacePrediction(BaseModel):
     face: int
-    label: str           # "fake" | "real"
+    label: str           # "likely fake" | "likely real"
     confidence: float    # 0–100
 
 

@@ -22,6 +22,66 @@ const GAME_IMAGES = [
     label: 'REAL',
     explanation: 'Correct answer: REAL. Lighting is natural and reflections are accurate.',
   },
+  {
+    src: 'https://plus.unsplash.com/premium_photo-1777023616744-05bb1f9e7620?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxmZWF0dXJlZC1waG90b3MtZmVlZHwyfHx8ZW58MHx8fHx8',
+    label: 'REAL',
+    explanation: 'Correct answer: REAL. Natural texture and lighting are consistent across the frame.',
+  },
+  {
+    src: 'https://imgs.search.brave.com/VdwDAlvyVaQjdJIHRZir_tBh3GdpxV1_EooFFuRfD3o/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly93d3cu/ZGl5cGhvdG9ncmFw/aHkubmV0L3dwLWNv/bnRlbnQvdXBsb2Fk/cy8yMDIzLzEyL3Bv/cGUtZnJhbmNpcy1h/aS1jb3Zlci5qcGc',
+    label: 'FAKE',
+    explanation: 'Correct answer: FAKE. Subtle inconsistencies in facial features and unnatural eye reflections.',
+  },
+  {
+    src: 'https://thispersonnotexist.org/downloadimage/Ac3RhdGljL21hbi9zZWVkNDE4MTQuanBlZw==',
+    label: 'FAKE',
+    explanation: 'Correct answer: FAKE. Skin texture looks overly smooth and uniform in some areas.',
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8YWklMjBnZW5lcmF0ZWQlMjBwZXJzb258ZW58MHx8MHx8fDA%3D',
+    label: 'FAKE',
+    explanation: 'Correct answer: FAKE. Subtle inconsistencies in facial features and unnatural eye reflections.',
+  },
+  {
+    src: 'https://plus.unsplash.com/premium_photo-1675791188810-3a01768c1e2f?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8cGVvcGxlfGVufDB8fDB8fHww',
+    label: 'REAL',
+    explanation: 'Correct answer: REAL. Natural texture and lighting are consistent across the frame.',
+  },
+  {
+    src: 'https://plus.unsplash.com/premium_photo-1776286146606-ebad3b8449c8?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MjF8fGFpJTIwZ2VuZXJhdGVkJTIwcGVvcGxlfGVufDB8fDB8fHww',
+    label: 'FAKE',
+    explanation: 'Correct answer: FAKE. Subtle inconsistencies in facial features and unnatural eye reflections.',
+  },
+  {
+    src: 'https://thispersonnotexist.org/downloadimage/Ac3RhdGljL21hbi94c2VlZDMyMDguanBlZw==',
+    label: 'FAKE',
+    explanation: 'Correct answer: FAKE. Skin texture looks overly smooth and uniform in some areas.',
+  },
+  {
+    src: 'https://plus.unsplash.com/premium_photo-1671656349322-41de944d259b?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTd8fHBlcnNvbnxlbnwwfHwwfHx8MA%3D%3D',
+    label: 'REAL',
+    explanation: 'Correct answer: REAL. Natural texture and lighting are consistent across the frame.',
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1534458246008-80a1ce3028cd?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Njh8fHBlcnNvbnxlbnwwfHwwfHx8MA%3D%3D',
+    label: 'REAL',
+    explanation: 'Correct answer: REAL. Natural texture and lighting are consistent across the frame.',
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1748371050720-1559830110c3?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NjJ8fGFpJTIwZ2VuZXJhdGVkJTIwcGVyc29ufGVufDB8fDB8fHww',
+    label: 'FAKE',
+    explanation: 'Correct answer: FAKE. Subtle inconsistencies in facial features and unnatural eye reflections.',
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1484353371297-d8cfd2895020?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mzh8fHBlb3BsZXxlbnwwfHwwfHx8MA%3D%3D',
+    label: 'REAL',
+    explanation: 'Correct answer: REAL. Natural texture and lighting are consistent across the frame.',
+  },
+  {
+    src: 'https://thispersonnotexist.org/downloadimage/Ac3RhdGljL21hbi9zZWVkMDY0My5qcGVn',
+    label: 'FAKE',
+    explanation: 'Correct answer: FAKE. Skin texture looks overly smooth and uniform in some areas.',
+  }
 ]
 
 export default function DeepfakeGame() {
@@ -53,7 +113,7 @@ export default function DeepfakeGame() {
       border: `1px solid ${theme.border}`,
       boxShadow: theme.boxShadow,
       padding: '0.8rem',
-      maxWidth: '520px',
+      maxWidth: '720px',
       margin: '0 auto',
       transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease'
     }}>
@@ -73,7 +133,7 @@ export default function DeepfakeGame() {
         background: theme.bg,
         border: `1px solid ${theme.border}`,
         width: '100%',
-        maxWidth: '200px',
+        maxWidth: '340px',
         aspectRatio: '1 / 1',
         margin: '0 auto 1rem'
       }}>

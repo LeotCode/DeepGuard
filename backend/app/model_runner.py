@@ -1039,7 +1039,7 @@ def run_image_pipeline(image_path: str, filename: str) -> dict:
         face_score = _effnet_score(crop, fv_crop) * 100
         all_predictions.append({
             "face":       i + 1,
-            "label":      "fake" if face_score > 50 else "real",
+            "label":      "likely fake" if face_score > 50 else "likely real",
             "confidence": round(face_score, 2),
         })
 
