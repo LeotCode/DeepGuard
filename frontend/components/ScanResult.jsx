@@ -223,11 +223,35 @@ function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
               </div>
             ) : (
               // Image with heatmap overlay
-              <div style={{ position: 'relative' }}>
-                <img src={liveUrl} alt="Analysis" style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'contain', display: 'block', borderRadius: '8px' }} />
+              // Use inline-block so the wrapper shrinks to the actual image size
+              // preventing the SVG overlay from covering letterbox bars
+              <div style={{ position: 'relative', display: 'inline-block', width: '100%', lineHeight: 0 }}>
+                <img
+                  src={liveUrl}
+                  alt="Analysis"
+                  style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'contain', display: 'block', borderRadius: '8px' }}
+                />
                 {show && regions.length > 0 && (
-                  <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-                    {regions.map((r, i) => { const c = getColor(r.intensity); return <rect key={i} x={`${r.x}%`} y={`${r.y}%`} width={`${r.width}%`} height={`${r.height}%`} fill={c.fill} stroke={c.stroke} strokeWidth="2" /> })}
+                  <svg
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                  >
+                    {regions.map((r, i) => {
+                      const c = getColor(r.intensity)
+                      return (
+                        <rect
+                          key={i}
+                          x={r.x}
+                          y={r.y}
+                          width={r.width}
+                          height={r.height}
+                          fill={c.fill}
+                          stroke={c.stroke}
+                          strokeWidth="0.5"
+                        />
+                      )
+                    })}
                   </svg>
                 )}
               </div>
@@ -307,6 +331,32 @@ function AnalysisSummary({ summary }) {
   )
 }
 
+function FileDetails({ result }) {
+  const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  return (
+    <Card>
+      <CardHeader><CardTitle>File Details</CardTitle></CardHeader>
+      <CardBody>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {[{ label: 'Type', value: result.file_type || 'Image' }, { label: 'Faces Detected', value: result.total_faces }].map(({ label, value }) => (
+            <div key={label}>
+              <p style={{ margin: '0 0 3px', fontSize: '0.82rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>{label}</p>
+              <p style={{ margin: 0, fontWeight: '700', color: theme.text, textTransform: 'capitalize', fontSize: '1.04rem', fontFamily: FONT, transition: 'color 0.3s ease' }}>{value}</p>
+            </div>
+          ))}
+          {result.file_url && (
+            <button onClick={() => window.open(result.file_url, '_blank')} style={{ marginTop: '0.35rem', width: '100%', padding: '0.8rem', backgroundColor: theme.primary, color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '0.95rem', fontFamily: FONT, fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'background-color 0.3s ease' }}>
+              View Original File
+            </button>
+          )}
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
+
 export default function ScanResult({ result }) {
   const { theme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -352,8 +402,9 @@ export default function ScanResult({ result }) {
           )}
         </div>
         <div>
-          {result.analysis_summary && <AnalysisSummary summary={result.analysis_summary} />}
           {result.red_flags?.length > 0 && <RedFlagsList flags={result.red_flags} />}
+          {result.analysis_summary && <AnalysisSummary summary={result.analysis_summary} />}
+          <FileDetails result={result} />
         </div>
       </div>
     </div>
