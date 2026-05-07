@@ -206,7 +206,7 @@ export default function Home() {
             <div style={{ borderRadius: '24px', overflow: 'hidden', background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '0.8rem', transition: 'border-color 0.3s ease' }}>
               <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Real Image</p>
               <img
-                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80"
+                src="/images/real_guy.png"
                 alt="Real portrait example"
                 style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '18px', display: 'block' }}
               />
@@ -215,7 +215,7 @@ export default function Home() {
             <div style={{ borderRadius: '24px', overflow: 'hidden', background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '0.8rem', transition: 'border-color 0.3s ease' }}>
               <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Edited Version</p>
               <img
-                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80&sat=-100&contrast=130&blur=20"
+                src="/images/deepfake_tom.png"
                 alt="Edited portrait example"
                 style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '18px', display: 'block', filter: 'contrast(1.08) saturate(0.72) hue-rotate(-8deg)' }}
               />

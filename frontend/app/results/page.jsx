@@ -152,10 +152,6 @@ export default function Results() {
                   <div style={{ backgroundColor: theme.border, borderRadius: '4px', height: '4px', transition: 'background-color 0.3s ease' }}>
                     <div style={{ height: '100%', width: `${score}%`, backgroundColor: color, borderRadius: '4px' }} />
                   </div>
-
-                  <p style={{ color: theme.muted, fontSize: '0.75rem', margin: '0.6rem 0 0', fontFamily: FONT, transition: 'color 0.3s ease' }}>
-                    {item.date} · {item.total_faces} face(s)
-                  </p>
                 </div>
               </div>
             )
