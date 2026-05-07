@@ -133,7 +133,7 @@ async def scan_file(
         )
 
     # ── write to a temp file (needed by OpenCV / torch) ────────────────────
-    suffix = Path(file.filename).suffix or (".jpg" if is_image else ".mp4")
+    suffix = Path(file.filename).suffix or (".jpg" if is_image else ".wav" if is_audio else ".mp4")
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(raw)
         tmp_path = tmp.name
@@ -153,7 +153,7 @@ async def scan_file(
             "scan_id": scan_id,
             "user_id": user_id,
             "filename": file.filename,
-            "file_type": "image" if is_image else "video",
+            "file_type": "image" if is_image else "audio" if is_audio else "video",
             "created_at": datetime.utcnow().isoformat() + "Z",
             **result_data,
         }

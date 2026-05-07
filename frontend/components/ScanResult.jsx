@@ -160,32 +160,14 @@ function HeatmapDisplay({ fileUrl, fileType, regions, scanId, spectrogram_image 
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   const [show, setShow] = useState(true)
-  const [liveUrl, setLiveUrl] = useState(fileUrl)
-  const [liveSpectrogram, setLiveSpectrogram] = useState(spectrogram_image)
 
-  useEffect(() => {
-    if (!scanId) { setLiveUrl(fileUrl); return }
-    if (fileType === 'video') {
-      const stored = sessionStorage.getItem(`deepguard_video_${scanId}`)
-      setLiveUrl(stored || fileUrl)
-    } else if (fileType === 'audio') {
-      const stored = sessionStorage.getItem(`deepguard_media_${scanId}`)
-      setLiveUrl(stored || fileUrl)
-      // Load spectrogram from sessionStorage if not already in props
-      if (!spectrogram_image) {
-        const storedSpec = sessionStorage.getItem(`deepguard_spectrogram_${scanId}`)
-        if (storedSpec) setLiveSpectrogram(storedSpec)
-      }
-    } else {
-      const stored = sessionStorage.getItem(`deepguard_media_${scanId}`)
-      setLiveUrl(stored || fileUrl)
-    }
-  }, [fileUrl, fileType, scanId, spectrogram_image])
+  // fileUrl comes directly from result.file_url which ResultsContext populates
+  // via IndexedDB hydration after reload — no sessionStorage lookup needed.
+  const liveUrl         = fileUrl || null
+  const liveSpectrogram = spectrogram_image || null
 
-  const isImage = !fileType || fileType === 'image'
-  const getColor = (i) => i >= 0.7 ? { fill: 'rgba(239,68,68,0.3)', stroke: '#ef4444' } : i >= 0.4 ? { fill: 'rgba(245,158,11,0.3)', stroke: '#f59e0b' } : { fill: 'rgba(34,197,94,0.3)', stroke: '#22c55e' }
-
-  // ✅ Fix #3: For audio, we can render the spectrogram even without liveUrl
+  const isImage    = !fileType || fileType === 'image'
+  const getColor   = (i) => i >= 0.7 ? { fill: 'rgba(239,68,68,0.3)', stroke: '#ef4444' } : i >= 0.4 ? { fill: 'rgba(245,158,11,0.3)', stroke: '#f59e0b' } : { fill: 'rgba(34,197,94,0.3)', stroke: '#22c55e' }
   const hasContent = liveUrl || liveSpectrogram || fileType === 'audio'
 
   return (

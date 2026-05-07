@@ -6,12 +6,30 @@ import { useTheme } from '@/context/ThemeContext'
 import ScanResult from '@/components/ScanResult'
 
 export default function ResultDetailPage({ params }) {
-  const { id }     = use(params)
-  const { results } = useResults()
-  const router      = useRouter()
-  const { theme }   = useTheme()
-  const result      = results.find((r) => String(r.id) === String(id))
+  const { id }              = use(params)
+  const { results, loading } = useResults()
+  const router              = useRouter()
+  const { theme }           = useTheme()
 
+  // Wait for context to load before deciding result not found
+  const result = results.find(
+    (r) => String(r.id) === String(id) || String(r.scan_id) === String(id)
+  )
+
+  // Still loading — show spinner
+  if (loading && !result) {
+    return (
+      <div style={{ minHeight: '100vh', background: theme.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', color: theme.muted, fontFamily: "'Jost', sans-serif" }}>
+          <div style={{ width: '40px', height: '40px', border: `3px solid ${theme.border}`, borderTopColor: theme.primary, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+          <p style={{ margin: 0, fontSize: '0.9rem' }}>Loading result...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Finished loading, still not found
   if (!result) {
     return (
       <div style={{ minHeight: '100vh', background: theme.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', fontFamily: "'Jost', sans-serif", transition: 'background-color 0.3s ease' }}>
@@ -25,6 +43,15 @@ export default function ResultDetailPage({ params }) {
         </button>
       </div>
     )
+  }
+
+  // Rehydrate file_url from backend media_url if present
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const rehydrated = {
+    ...result,
+    file_url: result.media_url
+      ? `${API_BASE}${result.media_url}`
+      : result.file_url,
   }
 
   return (
@@ -41,7 +68,7 @@ export default function ResultDetailPage({ params }) {
           </svg>
           Back to Results
         </button>
-        <ScanResult result={result} />
+        <ScanResult result={rehydrated} />
       </div>
     </div>
   )
