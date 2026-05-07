@@ -8,6 +8,7 @@ import ScanLoading from '@/components/ScanLoading'
 import BlogCarousel from '@/components/BlogCarousel'
 import FAQ from '@/components/FAQ'
 import { auth } from '@/lib/firebase'
+import { saveMedia } from '@/lib/mediaCache'
 
 const DEEP_GRADIENT = 'linear-gradient(135deg, #0f2557 0%, #163d86 52%, #2454b8 100%)'
 const DEEP_GRADIENT_HOVER = 'linear-gradient(135deg, #163d86 0%, #2454b8 100%)'
@@ -62,8 +63,6 @@ export default function Home() {
           // Only accept if we actually got image data (not a blank frame)
           if (dataUrl && dataUrl.length > 5000) {
             setThumbnail(dataUrl)
-            // Persist thumbnail for results page — base64 survives navigation
-            try { sessionStorage.setItem(`deepguard_thumbnail_${id}`, dataUrl) } catch (_) {}
           }
         } catch (_) {}
       }
@@ -123,37 +122,27 @@ export default function Home() {
       const id = data.scan_id || Date.now()
       setPendingId(id)
 
-      // For video/audio: store blob URL in sessionStorage so the result page
-      // can retrieve it without needing localStorage (which can't hold large blobs).
-      // sessionStorage survives navigation within the same tab.
-      // Re-create a fresh blob URL from the original File object and store it.
-      // Blob URLs die on navigation — sessionStorage keeps them alive within the tab.
+      // Persist the file binary in IndexedDB so a fresh blob URL can be
+      // recreated after a full page reload.  Blob URLs die when the page unloads;
+      // IndexedDB is the only storage that handles large binaries (video/audio).
       let resultFileUrl = preview
       if (selectedFile) {
-        const freshBlobUrl = URL.createObjectURL(selectedFile)
-        resultFileUrl = freshBlobUrl
-        if (selectedFile.type.startsWith('video/')) {
-          try { sessionStorage.setItem(`deepguard_video_${id}`, freshBlobUrl) } catch (_) {}
-        }
-        // Store for ALL media types under media key (images, audio, video)
-        try { sessionStorage.setItem(`deepguard_media_${id}`, freshBlobUrl) } catch (_) {}
-        // Store spectrogram for audio files
+        const cachedUrl = await saveMedia(id, selectedFile)
+        if (cachedUrl) resultFileUrl = cachedUrl
+        // Spectrogram is a small base64 string — sessionStorage is fine for it
         if (data.spectrogram_image) {
           try { sessionStorage.setItem(`deepguard_spectrogram_${id}`, data.spectrogram_image) } catch (_) {}
         }
-      }
-
-      // Store image preview (base64) in sessionStorage for result page
-      if (selectedFile && selectedFile.type.startsWith('image/') && preview) {
-        try { sessionStorage.setItem(`deepguard_media_${id}`, preview) } catch (_) {}
       }
 
       addResult({
         id,
         scan_id: data.scan_id,
         filename: selectedFile.name,
-        preview,
-        thumbnail: thumbnail || preview,
+        // Only pass preview if it's base64 (images). Blob URLs die on reload.
+        preview: preview && preview.startsWith('data:') ? preview : null,
+        // Only pass thumbnail if it's the canvas-captured base64 dataURL.
+        thumbnail: thumbnail && thumbnail.startsWith('data:') ? thumbnail : null,
         predictions: data.predictions || [],
         total_faces: data.total_faces ?? 0,
         ai_score: data.ai_score,
@@ -206,7 +195,7 @@ export default function Home() {
             <div style={{ borderRadius: '24px', overflow: 'hidden', background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '0.8rem', transition: 'border-color 0.3s ease' }}>
               <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Real Image</p>
               <img
-                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80"
+                src="/images/real_guy.png"
                 alt="Real portrait example"
                 style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '18px', display: 'block' }}
               />
@@ -215,7 +204,7 @@ export default function Home() {
             <div style={{ borderRadius: '24px', overflow: 'hidden', background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '0.8rem', transition: 'border-color 0.3s ease' }}>
               <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem', fontWeight: '800', color: theme.text, fontFamily: FONT, transition: 'color 0.3s ease' }}>Edited Version</p>
               <img
-                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80&sat=-100&contrast=130&blur=20"
+                src="/images/deepfake_tom.png"
                 alt="Edited portrait example"
                 style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '18px', display: 'block', filter: 'contrast(1.08) saturate(0.72) hue-rotate(-8deg)' }}
               />
