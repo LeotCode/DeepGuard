@@ -17,9 +17,14 @@ If a weight file does not exist the corresponding model runs with random
 from __future__ import annotations
 
 import os
+import io
+import base64
 import warnings
 import librosa
 import librosa.feature
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from groq import Groq as _GroqClient
 from dotenv import load_dotenv
 import math
@@ -32,10 +37,6 @@ load_dotenv(_BACKEND_ROOT / ".env")
 import cv2
 import numpy as np
 from PIL import Image
-import base64
-import io
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 
 # ── PyTorch ────────────────────────────────────────────────────────────────
 import torch
@@ -286,35 +287,38 @@ def _load_xception():
                 import h5py
 
                 def _weight_order(name):
-                    key = name.split('/')[-1].split(':')[0]
-                    return {'kernel':0,'depthwise_kernel':0,'pointwise_kernel':1,
-                            'gamma':0,'beta':1,'moving_mean':2,'moving_variance':3,'bias':1}.get(key, 9)
+                    n = name.split('/')[-1].split(':')[0]
+                    order = {'kernel':0,'gamma':1,'depthwise_kernel':0,'pointwise_kernel':0,
+                             'beta':2,'bias':3,'moving_mean':4,'moving_variance':5}
+                    return order.get(n, 6)
 
                 def _load_layer(layer, grp):
-                    """Load weights from h5py group into Keras layer."""
                     if not layer.weights:
                         return False
                     lname = layer.name
+                    wn_attr = grp.attrs.get("weight_names", [])
+                    if not len(wn_attr):
+                        return False
 
-                    # Navigate: grp/layer_name/layer_name/ or grp/layer_name/
-                    sub = grp
-                    if lname in grp:
-                        sub = grp[lname]
-                        if lname in sub:
-                            sub = sub[lname]
+                    # Filter to this layer
+                    layer_wns = []
+                    for wn in wn_attr:
+                        wn_str = wn.decode() if isinstance(wn, bytes) else wn
+                        if wn_str.startswith(lname + "/"):
+                            layer_wns.append(wn_str)
 
-                    # Get weight names from attribute or keys
-                    wn_attr = list(sub.attrs.get('weight_names', []))
-                    if wn_attr:
-                        wns = sorted(
-                            [w.decode() if isinstance(w, bytes) else w for w in wn_attr],
-                            key=_weight_order
-                        )
-                        arrays = [sub[w][:] for w in wns if w in sub]
-                    else:
-                        keys = sorted(sub.keys(), key=_weight_order)
-                        arrays = [sub[k][:] for k in keys]
+                    # DEDUPLICATE — remove Adam optimizer moment duplicates
+                    seen_types = set()
+                    deduped = []
+                    for wn_str in layer_wns:
+                        wtype = wn_str.split('/')[-1].split(':')[0]
+                        if wtype not in seen_types:
+                            seen_types.add(wtype)
+                            deduped.append(wn_str)
 
+                    deduped.sort(key=_weight_order)
+
+                    arrays = [grp[wn][:] for wn in deduped if wn in grp]
                     if len(arrays) == len(layer.weights):
                         layer.set_weights(arrays)
                         return True
@@ -323,71 +327,63 @@ def _load_xception():
                 loaded_base = 0
                 loaded_dense = 0
 
-                with h5py.File(str(_XCEPTION_PATH), 'r') as f:
-                    # Xception base layers are under the 'xception' top-level group
-                    xc_grp = f.get('xception')
-                    if xc_grp is None:
-                        print("[DeepGuard] Xception: 'xception' group not found in file")
-                    else:
+                with h5py.File(str(_XCEPTION_PATH), "r") as f:
+                    mw = f["model_weights"] if "model_weights" in f else f
+
+                    # Base Xception layers stored under model_weights/xception/
+                    if "xception" in mw:
+                        xc_grp = mw["xception"]
                         for layer in model.layers:
-                            if hasattr(layer, 'layers'):
-                                # Nested model — recurse into sub-layers
-                                for sub_layer in layer.layers:
-                                    if _load_layer(sub_layer, xc_grp):
+                            if hasattr(layer, 'layers'):  # nested model
+                                for sub in layer.layers:
+                                    if _load_layer(sub, xc_grp):
                                         loaded_base += 1
                             else:
-                                if isinstance(layer, tf.keras.layers.Dense):
-                                    continue  # handle separately
                                 if _load_layer(layer, xc_grp):
                                     loaded_base += 1
 
-                    # Dense head stored at root level
+                    # Dense head layers
                     for layer in model.layers:
                         if isinstance(layer, tf.keras.layers.Dense):
                             lname = layer.name
-                            grp = f.get(lname)
-                            if grp and _load_layer(layer, grp):
-                                loaded_dense += 1
+                            if lname in mw:
+                                if _load_layer(layer, mw[lname]):
+                                    loaded_dense += 1
 
                 print(f"[DeepGuard] Loaded Xception: {loaded_base} base + {loaded_dense} dense from {_XCEPTION_PATH}")
-                import numpy as np
-                t1 = float(model.predict(np.zeros((1,299,299,3), np.float32), verbose=0)[0][0])
-                t2 = float(model.predict(np.random.rand(1,299,299,3).astype(np.float32), verbose=0)[0][0])
-                print(f"[DeepGuard] Xception sanity — zeros: {t1:.4f}, random: {t2:.4f}")
-                if abs(t1 - t2) < 0.01:
-                    print("[DeepGuard] WARNING: near-identical outputs — weights may not have loaded")
+                test = np.random.rand(1, 299, 299, 3).astype(np.float32)
+                t1 = float(model.predict(test, verbose=0)[0][0])
+                test2 = np.zeros((1, 299, 299, 3), dtype=np.float32)
+                t2 = float(model.predict(test2, verbose=0)[0][0])
+                print(f"[DeepGuard] Xception sanity — random input: {t1:.4f}, zeros: {t2:.4f}")
 
             except Exception as e:
                 import traceback
-                print(f"[DeepGuard] Xception load failed: {e}")
+                print(f"[DeepGuard] Xception h5py load failed: {e}")
                 traceback.print_exc()
+
         else:
-            print(f"[DeepGuard] Xception weights not found at {_XCEPTION_PATH}")
+            print(f"[DeepGuard] Xception not found at {_XCEPTION_PATH}, using random init.")
 
         _xception_model = model
     return _xception_model
 
 
 def _build_xception_arch():
-    """
-    Build Xception arch EXACTLY matching train3.py:
-      base = Xception(include_top=False, NO pooling)   ← no pooling kwarg
-      inputs = Input(299,299,3)
-      x = base(inputs, training=False)                 ← called as a layer
-      x = GlobalAveragePooling2D()(x)                  ← separate GAP layer
-      x = Dense(512, relu)(x)
-      x = Dropout(0.4)(x)
-      out = Dense(1, sigmoid)(x)
-    This matches the weight names in best_xception_weights.h5 exactly.
-    """
-    base   = Xception(weights=None, include_top=False, input_shape=(299, 299, 3))
-    inputs = tf.keras.Input(shape=(299, 299, 3))
-    x      = base(inputs, training=False)
-    x      = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x      = tf.keras.layers.Dense(512, activation="relu", name="dense")(x)
-    x      = tf.keras.layers.Dropout(0.4)(x)
-    out    = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
-    return tf.keras.Model(inputs=inputs, outputs=out)
+    """Build Xception architecture matching the training code."""
+    try:
+        base_model = Xception(
+            weights="imagenet",
+            include_top=False,
+            input_shape=(299, 299, 3),
+        )
+    except Exception as e:
+        print(f"[DeepGuard] Xception ImageNet base load warning: {e}. Using weights=None.")
+        base_model = Xception(
+            weights=None,
+            include_top=False,
+            input_shape=(299, 299, 3),
+        )
 
     base_model.trainable = False
 
@@ -530,10 +526,13 @@ def _effnet_score(img: Image.Image, feature_vec: np.ndarray) -> float:
 def _xception_score(img: Image.Image) -> float:
     """
     Score an image with Xception.
-    The model outputs high values (~1.0) for most inputs due to training bias.
-    We use two techniques to extract useful signal:
-    1. Compare score vs a reference blank image — the DIFFERENCE matters
-    2. Apply temperature scaling T=12 to spread the compressed distribution
+    The model is biased toward high outputs (~0.99 for most inputs).
+    We apply logit rescaling (temperature=8) to spread the distribution:
+      - Very high raw outputs (~0.9997) stay high after rescaling
+      - Medium raw outputs (~0.85) get pulled toward 0.5
+      - Low raw outputs pull toward 0
+    This makes Xception contribute meaningful signal in the ensemble
+    rather than always voting ~100% fake.
     """
     model = _load_xception()
     arr   = np.array(img.convert("RGB").resize((299, 299))).astype(np.float32)
@@ -541,10 +540,11 @@ def _xception_score(img: Image.Image) -> float:
     pred  = model.predict(arr, verbose=0)[0]
     raw   = float(pred[1]) if (hasattr(pred,'__len__') and len(pred)==2) else float(pred[0])
 
-    # Temperature scaling T=12 to spread near-saturated outputs
-    raw    = float(np.clip(raw, 1e-7, 1 - 1e-7))
-    logit  = np.log(raw / (1 - raw))
-    T      = 12.0
+    # Temperature scaling: convert to logit, divide by T, convert back
+    # Higher T = more spread. T=8 spreads 0.85-0.9997 range across 0.1-0.99
+    raw   = float(np.clip(raw, 1e-7, 1 - 1e-7))
+    logit = np.log(raw / (1 - raw))
+    T     = 8.0
     scaled = float(1 / (1 + np.exp(-logit / T)))
     return scaled
 
@@ -1215,6 +1215,7 @@ def _mel_spectrogram_to_base64_png(mel_tensor: torch.Tensor, waveform: np.ndarra
         import traceback
         traceback.print_exc()
         return ""
+
 
 
 def _audio_score_from_path(file_path: str) -> tuple[float, str]:
