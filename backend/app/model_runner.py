@@ -32,6 +32,10 @@ load_dotenv(_BACKEND_ROOT / ".env")
 import cv2
 import numpy as np
 from PIL import Image
+import base64
+import io
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 # ── PyTorch ────────────────────────────────────────────────────────────────
 import torch
@@ -1149,7 +1153,71 @@ def _extract_audio_features(waveform: np.ndarray) -> np.ndarray:
     ], dtype=np.float32)
 
 
-def _audio_score_from_path(file_path: str) -> float:
+def _mel_spectrogram_to_base64_png(mel_tensor: torch.Tensor, waveform: np.ndarray) -> str:
+    """
+    Convert mel spectrogram tensor to a base64-encoded PNG image for frontend display.
+    
+    Args:
+        mel_tensor: Torch tensor of shape (1, 1, 128, T) with normalized mel spectrogram
+        waveform: Original waveform for duration calculation
+    
+    Returns:
+        Base64-encoded PNG string ready for use in frontend <img> src
+    """
+    try:
+        # Extract spectrogram from tensor (remove batch and channel dimensions)
+        mel_spec = mel_tensor.squeeze(0).squeeze(0).cpu().numpy()  # (128, T)
+        
+        # Create figure with dark background
+        fig, ax = plt.subplots(figsize=(12, 4), dpi=100)
+        fig.patch.set_facecolor('#1a1a1a')
+        ax.set_facecolor('#0a0a0a')
+        
+        # Display mel spectrogram
+        im = ax.imshow(mel_spec, aspect='auto', origin='lower', cmap='viridis', interpolation='bilinear')
+        
+        # Calculate time axis in seconds
+        duration = len(waveform) / _AUDIO_SR
+        time_bins = mel_spec.shape[1]
+        time_labels = np.linspace(0, duration, 5)
+        time_ticks = np.linspace(0, time_bins - 1, 5)
+        
+        # Set labels and ticks
+        ax.set_xlabel('Time (s)', color='#ffffff', fontsize=10)
+        ax.set_ylabel('Mel Frequency (Hz)', color='#ffffff', fontsize=10)
+        ax.set_xticks(time_ticks)
+        ax.set_xticklabels([f'{t:.1f}' for t in time_labels], color='#ffffff', fontsize=8)
+        ax.set_yticks([0, 32, 64, 96, 127])
+        ax.set_yticklabels([0, '~2k', '~5k', '~8k', '~16k'], color='#ffffff', fontsize=8)
+        
+        # Style colorbar
+        cbar = plt.colorbar(im, ax=ax, label='Log Power (dB)')
+        cbar.ax.tick_params(colors='#ffffff', labelsize=8)
+        cbar.set_label('Log Power (dB)', color='#ffffff', fontsize=9)
+        
+        # Add title
+        ax.set_title('Audio Spectrogram Analysis', color='#ffffff', fontsize=12, fontweight='bold', pad=10)
+        
+        # Tight layout
+        plt.tight_layout()
+        
+        # Convert to PNG bytes
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none')
+        buf.seek(0)
+        plt.close(fig)
+        
+        # Encode to base64
+        img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{img_base64}"
+    except Exception as e:
+        print(f"[DeepGuard] Error generating spectrogram PNG: {e}")
+        import traceback
+        traceback.print_exc()
+        return ""
+
+
+def _audio_score_from_path(file_path: str) -> tuple[float, str]:
     """
     Full audio preprocessing pipeline matching AudioPreprocessor.process_audio() exactly:
       1. Load to mono 16kHz float32
@@ -1157,6 +1225,9 @@ def _audio_score_from_path(file_path: str) -> float:
       3. Log-mel spectrogram (n_fft=1024, hop=512, n_mels=128) → normalise [0,1]
       4. 13 scalar handcrafted features (MFCC, spectral, pitch, HNR, etc.)
       5. Run through _AudioCNN → sigmoid → P(fake) 0-100
+    
+    Returns:
+        Tuple of (score: float, spectrogram_image_base64: str)
     """
     try:
         waveform   = _load_waveform(file_path)
@@ -1167,11 +1238,15 @@ def _audio_score_from_path(file_path: str) -> float:
         model = _load_audio()
         with torch.no_grad():
             pred = model(mel_tensor.to(_DEVICE), feat_tensor.to(_DEVICE))
-        return round(float(pred.squeeze()) * 100.0, 2)
+        
+        score = round(float(pred.squeeze()) * 100.0, 2)
+        spectrogram_image = _mel_spectrogram_to_base64_png(mel_tensor, waveform)
+        
+        return score, spectrogram_image
     except Exception as e:
         print(f"[DeepGuard] Audio scoring error: {e}")
         import traceback; traceback.print_exc()
-        return 50.0
+        return 50.0, ""
 
 
 def run_image_pipeline(image_path: str, filename: str) -> dict:
@@ -1268,7 +1343,7 @@ def run_audio_pipeline(file_path: str, filename: str) -> dict:
     Run audio deepfake detection on a standalone audio file.
     Also used for the audio track of video files.
     """
-    audio_score = _audio_score_from_path(file_path)
+    audio_score, spectrogram_image = _audio_score_from_path(file_path)
     is_deepfake = audio_score >= 50.0
 
     flags = []
@@ -1302,6 +1377,7 @@ def run_audio_pipeline(file_path: str, filename: str) -> dict:
         "red_flags":        flags,
         "analysis_summary": summary,
         "frames_analyzed":  0,
+        "spectrogram_image": spectrogram_image,
     }
 
 def run_video_pipeline(video_path: str, filename: str, num_frames: int = 10) -> dict:

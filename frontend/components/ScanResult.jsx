@@ -155,7 +155,7 @@ function TimelineGraph({ data }) {
   )
 }
 
-function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
+function HeatmapDisplay({ fileUrl, fileType, regions, scanId, spectrogram_image }) {
   const { theme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -164,26 +164,32 @@ function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
 
   useEffect(() => {
     if (!scanId) { setLiveUrl(fileUrl); return }
-    if (fileType === 'video' || fileType === 'audio') {
+    if (fileType === 'video') {
       const stored = sessionStorage.getItem(`deepguard_video_${scanId}`)
       setLiveUrl(stored || fileUrl)
+    } else if (fileType === 'audio') {
+      // ✅ Fix #1: Use the correct audio-specific key
+      const stored = sessionStorage.getItem(`deepguard_audio_${scanId}`)
+      setLiveUrl(stored || fileUrl)
     } else {
-      // Images: sessionStorage blob URL survives navigation, direct blob URL does not
       const stored = sessionStorage.getItem(`deepguard_media_${scanId}`)
       setLiveUrl(stored || fileUrl)
     }
-  }, [fileUrl, fileType, scanId])
+  }, [fileUrl, fileType, scanId]) // ✅ Fix #2: Removed spectrogram_image — it's not used here
 
   const isImage = !fileType || fileType === 'image'
   const getColor = (i) => i >= 0.7 ? { fill: 'rgba(239,68,68,0.3)', stroke: '#ef4444' } : i >= 0.4 ? { fill: 'rgba(245,158,11,0.3)', stroke: '#f59e0b' } : { fill: 'rgba(34,197,94,0.3)', stroke: '#22c55e' }
+
+  // ✅ Fix #3: For audio, we can render the spectrogram even without liveUrl
+  const hasContent = liveUrl || (fileType === 'audio' && spectrogram_image)
 
   return (
     <Card>
       <CardHeader>
         <div>
-          <CardTitle>{isImage ? 'Spatial Heatmap Analysis' : 'Media Preview'}</CardTitle>
+          <CardTitle>{isImage ? 'Spatial Heatmap Analysis' : fileType === 'audio' ? 'Audio Spectrogram' : 'Media Preview'}</CardTitle>
           <p style={{ margin: '2px 0 0', fontSize: '0.9rem', color: theme.muted, fontFamily: FONT, transition: 'color 0.3s ease' }}>
-            {isImage ? 'Highlighted regions show potential AI manipulation' : 'Scanned media file'}
+            {isImage ? 'Highlighted regions show potential AI manipulation' : fileType === 'audio' ? 'Mel-frequency spectrogram showing audio frequency content over time' : 'Scanned media file'}
           </p>
         </div>
         {isImage && (
@@ -195,7 +201,7 @@ function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
       <CardBody>
         {/* Media area */}
         <div style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', backgroundColor: '#000', border: `1px solid ${theme.border}`, transition: 'border-color 0.3s ease' }}>
-          {liveUrl ? (
+          {hasContent ? (
             fileType === 'video' ? (
               // Use a wrapper div with intrinsic aspect ratio so portrait (9:16)
               // and landscape (16:9) videos both display correctly without black bars.
@@ -215,12 +221,20 @@ function HeatmapDisplay({ fileUrl, fileType, regions, scanId }) {
                 />
               </div>
             ) : fileType === 'audio' ? (
-              <div style={{ padding: '2.5rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', backgroundColor: theme.bg }}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
-                </svg>
-                <audio src={liveUrl} controls style={{ width: '100%', maxWidth: '420px' }} />
-              </div>
+              spectrogram_image ? (
+                <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', backgroundColor: theme.bg }}>
+                  <img
+                    src={spectrogram_image}
+                    alt="Audio Spectrogram"
+                    style={{ width: '100%', height: 'auto', maxHeight: '380px', objectFit: 'contain', display: 'block' }}
+                  />
+                </div>
+              ) : (
+                // Fallback if spectrogram not available
+                <div style={{ padding: '2.5rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', backgroundColor: theme.bg }}>
+                  <audio src={liveUrl} controls style={{ width: '100%', maxWidth: '420px' }} />
+                </div>
+              )
             ) : (
               // Image with heatmap overlay
               // inline-block so wrapper shrinks to image size, preventing SVG from covering letterbox bars
@@ -356,10 +370,12 @@ export default function ScanResult({ result }) {
           {result.temporal_data?.length > 0 && <TimelineGraph data={result.temporal_data} />}
           {(result.file_type === 'video' || result.file_type === 'audio' || result.file_type === 'image' || result.heatmap_regions?.length > 0) && (
             <HeatmapDisplay
+              key={result.id || result.scan_id}
               fileUrl={result.file_url}
               fileType={result.file_type}
               regions={result.heatmap_regions || []}
               scanId={result.id || result.scan_id}
+              spectrogram_image={result.spectrogram_image}
             />
           )}
         </div>

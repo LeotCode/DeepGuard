@@ -57,6 +57,9 @@ class ScanResult(BaseModel):
     red_flags: Optional[List[str]] = None
     analysis_summary: Optional[str] = None
     heatmap_regions: Optional[List[HeatmapRegion]] = None
+    
+    # Audio spectrogram visualization
+    spectrogram_image: Optional[str] = None
 
 
 class ScanHistoryItem(BaseModel):
@@ -76,3 +79,4 @@ class ScanHistoryItem(BaseModel):
     red_flags: Optional[List[str]] = None
     analysis_summary: Optional[str] = None
     heatmap_regions: Optional[List[Any]] = None
+    spectrogram_image: Optional[str] = None
