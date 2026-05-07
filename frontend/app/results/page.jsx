@@ -67,8 +67,8 @@ export default function Results() {
             // Videos have no per-face predictions — use ai_score + is_deepfake instead
             const score   = item.ai_score ?? top?.confidence ?? 0
             const isVideo = item.file_type === 'video' || item.file_type === 'audio'
-            const isFake  = isVideo ? item.is_deepfake : top?.label === 'likely fake'
-            const label   = isVideo ? (isFake ? 'Likely Fake' : 'Likely Real') : (isFake ? 'Likely Fake' : 'Likely Real')
+            const isFake  = item.ai_score != null ? item.ai_score > 50 : (item.is_deepfake ?? false)
+            const label   = isFake ? 'Fake' : 'Real'
             const color   = isFake ? '#ef4444' : '#22c55e'
             const bgBadge = isFake ? '#fef2f2' : '#f0fdf4'
 
@@ -98,21 +98,39 @@ export default function Results() {
                       </svg>
                       <span style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: '700', letterSpacing: '1.5px', fontFamily: FONT }}>AUDIO</span>
                     </div>
-                  ) : item.file_type === 'video' ? (
-                    <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                      {item.thumbnail ? (
-                        <img src={item.thumbnail} alt={item.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                      )}
-                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: '4px', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        <span style={{ color: '#fff', fontSize: '0.65rem', fontWeight: '700', fontFamily: "'Jost', sans-serif" }}>VIDEO</span>
+                  ) : item.file_type === 'video' ? (() => {
+                    const sid = item.id || item.scan_id
+                    const thumb = (item.thumbnail && !item.thumbnail.startsWith('blob:')) ? item.thumbnail
+                      : (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(`deepguard_thumbnail_${sid}`) : null)
+                    return (
+                      <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                        {thumb ? (
+                          <img src={thumb} alt={item.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                        )}
+                        <div style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: '4px', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                          <span style={{ color: '#fff', fontSize: '0.65rem', fontWeight: '700', fontFamily: "'Jost', sans-serif" }}>VIDEO</span>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <img src={item.thumbnail || item.preview} alt={item.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  )}
+                    )
+                  })() : (() => {
+                    const sid = item.id || item.scan_id
+                    const imgSrc = (item.thumbnail && !item.thumbnail.startsWith('blob:')) ? item.thumbnail
+                      : (item.preview && !item.preview.startsWith('blob:')) ? item.preview
+                      : (typeof sessionStorage !== 'undefined'
+                          ? sessionStorage.getItem(`deepguard_media_${sid}`) || sessionStorage.getItem(`deepguard_thumbnail_${sid}`)
+                          : null)
+                      || item.thumbnail || item.preview
+                    return imgSrc ? (
+                      <img src={imgSrc} alt={item.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', backgroundColor: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {/* Info */}
@@ -135,6 +153,9 @@ export default function Results() {
                     <div style={{ height: '100%', width: `${score}%`, backgroundColor: color, borderRadius: '4px' }} />
                   </div>
 
+                  <p style={{ color: theme.muted, fontSize: '0.75rem', margin: '0.6rem 0 0', fontFamily: FONT, transition: 'color 0.3s ease' }}>
+                    {item.date} · {item.total_faces} face(s)
+                  </p>
                 </div>
               </div>
             )

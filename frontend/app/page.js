@@ -60,7 +60,11 @@ export default function Home() {
           canvas.getContext('2d').drawImage(vid, 0, 0, w, h)
           const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
           // Only accept if we actually got image data (not a blank frame)
-          if (dataUrl && dataUrl.length > 5000) setThumbnail(dataUrl)
+          if (dataUrl && dataUrl.length > 5000) {
+            setThumbnail(dataUrl)
+            // Persist thumbnail for results page — base64 survives navigation
+            try { sessionStorage.setItem(`deepguard_thumbnail_${id}`, dataUrl) } catch (_) {}
+          }
         } catch (_) {}
       }
 
@@ -128,11 +132,20 @@ export default function Home() {
       if (selectedFile) {
         const freshBlobUrl = URL.createObjectURL(selectedFile)
         resultFileUrl = freshBlobUrl
-        if (selectedFile.type.startsWith('video/') || selectedFile.type.startsWith('audio/')) {
+        if (selectedFile.type.startsWith('video/')) {
           try { sessionStorage.setItem(`deepguard_video_${id}`, freshBlobUrl) } catch (_) {}
         }
-        // Store for ALL media types including images
+        // Store for ALL media types under media key (images, audio, video)
         try { sessionStorage.setItem(`deepguard_media_${id}`, freshBlobUrl) } catch (_) {}
+        // Store spectrogram for audio files
+        if (data.spectrogram_image) {
+          try { sessionStorage.setItem(`deepguard_spectrogram_${id}`, data.spectrogram_image) } catch (_) {}
+        }
+      }
+
+      // Store image preview (base64) in sessionStorage for result page
+      if (selectedFile && selectedFile.type.startsWith('image/') && preview) {
+        try { sessionStorage.setItem(`deepguard_media_${id}`, preview) } catch (_) {}
       }
 
       addResult({
@@ -154,6 +167,7 @@ export default function Home() {
         file_type: data.file_type || 'image',
         is_deepfake: data.is_deepfake,
         frames_analyzed: data.frames_analyzed,
+        spectrogram_image: data.spectrogram_image || null,
         created_at: data.created_at || new Date().toISOString(),
         date: data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : new Date().toLocaleDateString(),
       })

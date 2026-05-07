@@ -25,13 +25,23 @@ function mergeMedia(results) {
   return results.map((r) => {
     const id = r.scan_id || r.id
     const cached = cache[id] || {}
+    // Also check sessionStorage for media that was stored during the scan session
+    let sessionThumb = null
+    let sessionMedia = null
+    let sessionSpec  = null
+    try {
+      sessionThumb = sessionStorage.getItem(`deepguard_thumbnail_${id}`)
+      sessionMedia = sessionStorage.getItem(`deepguard_media_${id}`)
+      sessionSpec  = sessionStorage.getItem(`deepguard_spectrogram_${id}`)
+    } catch (_) {}
     return {
       ...r,
       id,
-      file_url:  r.file_url  || cached.file_url  || null,
-      thumbnail: r.thumbnail || cached.thumbnail || null,
-      preview:   r.preview   || cached.preview   || null,
-      file_type: r.file_type || cached.file_type || 'image',
+      file_url:          r.file_url          || cached.file_url          || sessionMedia || null,
+      thumbnail:         r.thumbnail         || cached.thumbnail         || sessionThumb || sessionMedia || null,
+      preview:           r.preview           || cached.preview           || sessionMedia || null,
+      file_type:         r.file_type         || cached.file_type         || 'image',
+      spectrogram_image: r.spectrogram_image || cached.spectrogram_image || sessionSpec  || null,
     }
   })
 }
@@ -91,10 +101,15 @@ export function ResultsProvider({ children }) {
     if (result.file_url || result.thumbnail || result.preview) {
       const cache = loadMediaCache()
       cache[id] = {
-        file_url:  result.file_url  || null,
-        thumbnail: result.thumbnail || null,
-        preview:   result.preview   || null,
-        file_type: result.file_type || 'image',
+        file_url:          result.file_url          || null,
+        thumbnail:         result.thumbnail         || null,
+        preview:           result.preview           || null,
+        file_type:         result.file_type         || 'image',
+        spectrogram_image: result.spectrogram_image || null,
+      }
+      // Also cache base64 thumbnail directly if it's a dataURL (survives reload)
+      if (result.thumbnail && result.thumbnail.startsWith('data:')) {
+        try { sessionStorage.setItem(`deepguard_thumbnail_${id}`, result.thumbnail) } catch (_) {}
       }
       saveMediaCache(cache)
     }
