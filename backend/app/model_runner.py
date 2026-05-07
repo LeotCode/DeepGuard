@@ -370,42 +370,29 @@ def _load_xception():
 
 
 def _build_xception_arch():
-    """Build Xception architecture matching the training code."""
-    try:
-        base_model = Xception(
-            weights="imagenet",
-            include_top=False,
-            input_shape=(299, 299, 3),
-        )
-    except Exception as e:
-        print(f"[DeepGuard] Xception ImageNet base load warning: {e}. Using weights=None.")
-        base_model = Xception(
-            weights=None,
-            include_top=False,
-            input_shape=(299, 299, 3),
-        )
-
-    base_model.trainable = False
-
+    
+    """
+    Build Xception arch EXACTLY matching the training script for best_xception_weights.h5:
+      base = Xception(include_top=False, NO pooling)   ← no pooling kwarg
+      inputs = Input(299,299,3)
+      x = base(inputs, training=False)                 ← called as a layer
+      x = GlobalAveragePooling2D()(x)                  ← separate GAP layer
+      x = Dense(512, relu)(x)
+      x = Dropout(0.4)(x)
+      out = Dense(1, sigmoid)(x)
+    This matches the weight names in best_xception_weights.h5 exactly.
+    """
+    base   = Xception(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
     inputs = tf.keras.Input(shape=(299, 299, 3))
-    x = base_model(inputs, training=False)
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x = tf.keras.layers.Dense(512, activation="relu")(x)
-    x = tf.keras.layers.Dropout(0.4)(x)
-    outputs = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+    x      = base(inputs, training=False)
+    x      = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x      = tf.keras.layers.Dense(512, activation="relu", name="dense")(x)
+    x      = tf.keras.layers.Dropout(0.4)(x)
+    out    = tf.keras.layers.Dense(1, activation="sigmoid", name="dense_1")(x)
+    return tf.keras.Model(inputs=inputs, outputs=out)
 
-    model = tf.keras.Model(inputs, outputs)
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-        loss="binary_crossentropy",
-        metrics=[
-            "accuracy",
-            tf.keras.metrics.AUC(name="auc"),
-            tf.keras.metrics.Precision(name="precision"),
-            tf.keras.metrics.Recall(name="recall"),
-        ],
-    )
-    return model
+
+   
 
 
 def _load_resnet():

@@ -1,9 +1,9 @@
 """
 Firebase / Firestore client + Firebase Auth token verifier.
 
-Set the environment variable FIREBASE_SERVICE_ACCOUNT_JSON to the *path*
-of your service-account JSON file, OR set FIREBASE_SERVICE_ACCOUNT_INLINE
-to the raw JSON string (useful for Render / Railway / etc.).
+Set FIREBASE_SERVICE_ACCOUNT_JSON to the *path* of your service-account JSON
+file, set FIREBASE_SERVICE_ACCOUNT_INLINE to the raw JSON string, or use
+Application Default Credentials on Cloud Run.
 """
 
 import os
@@ -26,25 +26,29 @@ def _init_firebase() -> None:
     # Prefer inline JSON (env var contains the JSON string directly)
     inline = os.environ.get("FIREBASE_SERVICE_ACCOUNT_INLINE")
     path   = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+    project_id = os.environ.get("FIREBASE_PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
 
     if inline:
         service_account_info = json.loads(inline)
         cred = credentials.Certificate(service_account_info)
+        project_id = project_id or service_account_info.get("project_id")
     elif path:
         cred = credentials.Certificate(path)
+        with open(path, "r", encoding="utf-8") as service_account_file:
+            project_id = project_id or json.load(service_account_file).get("project_id")
     else:
-        raise RuntimeError(
-            "Firebase credentials not configured. "
-            "Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_INLINE."
-        )
+        cred = credentials.ApplicationDefault()
 
-    firebase_admin.initialize_app(cred, {'projectId': 'deepguard-project'})
+    options = {"projectId": project_id} if project_id else None
+    firebase_admin.initialize_app(cred, options)
 
 
 _init_firebase()
 
 # Firestore database handle — used across the app
-db: firestore.Client = firestore.client(database_id='deepguard')
+db: firestore.Client = firestore.client(
+    database_id=os.environ.get("FIRESTORE_DATABASE_ID", "deepguard")
+)
 
 
 # ──────────────────────────────────────────────

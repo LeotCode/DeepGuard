@@ -1,15 +1,19 @@
 services:
   backend:
     build: ./backend
+    container_name: deepguard-backend
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8000:8080"
     env_file:
       - ./backend/.env
+    environment:
+      PORT: 8080
     volumes:
       - ./backend/secrets:/app/secrets:ro
       - ./backend/models:/app/models:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -17,12 +21,15 @@ services:
 
   frontend:
     build: ./frontend
+    container_name: deepguard-frontend
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3000:8080"
     env_file:
       - ./frontend/.env.local
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
+      PORT: 8080
     depends_on:
       backend:
         condition: service_healthy
