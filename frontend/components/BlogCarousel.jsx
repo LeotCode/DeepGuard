@@ -17,24 +17,10 @@ export default function BlogCarousel() {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const apiKey = process.env.NEXT_PUBLIC_NEWS_API_KEY
-        if (!apiKey) {
-          console.error('News API key not found')
-          setLoading(false)
-          return
-        }
-        const response = await fetch(`https://newsapi.org/v2/everything?q=deepfakes&apiKey=${apiKey}&sortBy=publishedAt&pageSize=4&language=en`)
+        const response = await fetch('/api/news')
         const data = await response.json()
         if (data.status === 'ok') {
-          const mappedPosts = data.articles.map(article => ({
-            tag: article.source.name || 'NEWS',
-            title: article.title,
-            body: article.description || 'No description available.',
-            stat: new Date(article.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            statLabel: 'Published',
-            link: article.url
-          }))
-          setPosts(mappedPosts)
+          setPosts(data.articles)
         } else {
           console.error('Error fetching news:', data.message)
         }
